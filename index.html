@@ -25,7 +25,7 @@
             left: 50%;
             transform: translateX(-50%);
             color: rgba(255,255,255,0.5);
-            font-size: 28px;
+            font-size: clamp(9px, 3.5vh, 14px);
             pointer-events: none;
             letter-spacing: 0.5px;
         }
@@ -352,6 +352,7 @@
             <button class="debug-btn" data-ch="7">3-2</button>
             <button class="debug-btn" data-ch="8">3-3</button>
             <button class="debug-btn" data-ch="9">4-1</button>
+            <button class="debug-btn mystery-btn">???</button>
         </div>
         <div class="debug-col">
             <button class="debug-btn enter-btn" data-lvl="3">L1-1</button>
@@ -430,11 +431,13 @@
         let L2_TH = BASE_L2_TH;
         let OVERLAP_THRESHOLD = Math.min(L2_TW, L2_TH) * 0.18;
         let scaleFactor = 1;
+        let MAP_FONT = 64;
 
         function applyScale(factor) {
             scaleFactor = factor;
             W = Math.round(BASE_W * factor);
             H = Math.round(BASE_H * factor);
+            MAP_FONT = Math.max(14, Math.min(64, Math.round(W * 0.6)));
             L2_TW = Math.round(BASE_L2_TW * factor);
             L2_TH = Math.round(BASE_L2_TH * factor);
             VERTEX_HIT_RADIUS = Math.round(BASE_VERTEX_RADIUS * factor);
@@ -496,6 +499,7 @@
         let mapEntryCooldown = 0;
         let irisActive = false, irisRadius = 0, irisDone = false;
         let irisTargetEntry = null;
+        let shiftX = 0, shiftY = 0, mysteryAnchor = false;
         let introPhase = 0, introTimer = 0, fallY = 0, fallVY = 0, cameraPan = 0, dialogText = '', fadeAlpha = 0;
         let mapPhase = 0;
         let tutPhase = 0;
@@ -1497,7 +1501,7 @@
         }
 
         function recomputeScaleOffsets2() {
-            const anchor = corners2[scaleAnchorIdx2];
+            const anchor = scaleAnchorIdx2 === 4 ? { x: (corners2[0].x + corners2[2].x) / 2, y: (corners2[0].y + corners2[2].y) / 2 } : corners2[scaleAnchorIdx2];
             scaleBaseOffsets2 = corners2.map(c => ({
                 x: (c.x - anchor.x) / Math.max(scaleValue2, 0.01),
                 y: (c.y - anchor.y) / Math.max(scaleValue2, 0.01),
@@ -1509,7 +1513,7 @@
                 scalePhase2 += scaleDir2 * SCALE_SPEED * speedMultiplier;
                 scaleValue2 = 0.5 + 0.25 * Math.sin(scalePhase2);
             }
-            const anchor = corners2[scaleAnchorIdx2];
+            const anchor = scaleAnchorIdx2 === 4 ? { x: (corners2[0].x + corners2[2].x) / 2, y: (corners2[0].y + corners2[2].y) / 2 } : corners2[scaleAnchorIdx2];
             for (let i = 0; i < 4; i++) {
                 corners2[i] = {
                     x: anchor.x + scaleBaseOffsets2[i].x * scaleValue2,
@@ -1900,6 +1904,12 @@
             const pos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
             mousePos = pos;
 
+            if (gameState === 'MYSTERY') {
+                mouseDown = true;
+                mysteryAnchor = !mysteryAnchor;
+                return;
+            }
+
             if (traps.length > 0 && pausedTrap < 0 && state === 'ROTATING') {
                 for (let i = 0; i < traps.length; i++) {
                     if (traps[i].state === 'ROTATING' && pointInPolygon(pos, traps[i].corners)) {
@@ -1957,7 +1967,15 @@
             mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
             if ('ontouchstart' in window) return;
 
-            if (heroMotion === 'align' && state === 'PAUSED') {
+            if (gameState === 'MYSTERY' && mysteryAnchor) {
+                let near = false;
+                const tcx = canvasW / 2, tcy = canvasH / 2;
+                const dirs = [{x:tcx,y:tcy-40},{x:tcx,y:tcy+40},{x:tcx-40,y:tcy},{x:tcx+40,y:tcy}];
+                for (const d of dirs) { if (Math.abs(mousePos.x-d.x)<14 && Math.abs(mousePos.y-d.y)<14) { near=true; break; } }
+                canvas.style.cursor = near ? 'pointer' : 'default';
+            } else if (gameState === 'MYSTERY') {
+                canvas.style.cursor = 'crosshair';
+            } else if (heroMotion === 'align' && state === 'PAUSED') {
                 let near = false;
                 for (const a of alignAnchors) {
                     const dx = mousePos.x - a.x, dy = mousePos.y - a.y;
@@ -1996,6 +2014,24 @@
 
             const rect = canvas.getBoundingClientRect();
             const pos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+            if (gameState === 'MYSTERY' && mysteryAnchor) {
+                const tcx = canvasW / 2, tcy = canvasH / 2;
+                const dx = pos.x - tcx, dy = pos.y - tcy;
+                if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+                    const step = W * 1.6;
+                    if (Math.abs(dx) > Math.abs(dy)) shiftX += dx > 0 ? step : -step;
+                    else shiftY += dy > 0 ? step : -step;
+                    for (const t of mapTargets) {
+                        if (t.cx + shiftX - t.w/2 < 0) shiftX = -(t.cx - t.w/2);
+                        if (t.cx + shiftX + t.w/2 > canvasW) shiftX = canvasW - (t.cx + t.w/2);
+                        if (t.cy + shiftY - t.h/2 < 0) shiftY = -(t.cy - t.h/2);
+                        if (t.cy + shiftY + t.h/2 > canvasH) shiftY = canvasH - (t.cy + t.h/2);
+                    }
+                }
+                mysteryAnchor = false;
+                return;
+            }
 
             if (pausedTrap >= 0) {
                 const near = findNearTrapVertex(pos, traps[pausedTrap]);
@@ -2143,6 +2179,10 @@
             }
             if (gameState === 'INTRO') {
                 drawIntro();
+                return;
+            }
+            if (gameState === 'MYSTERY') {
+                drawMystery();
                 return;
             }
             if (gameState === 'MAP') {
@@ -2727,6 +2767,22 @@
                 startLevel(irisTargetEntry.level);
                 return;
             }
+            if (gameState === 'MYSTERY') {
+                if (state === 'ROTATING') angle += ROTATION_SPEED * speedMultiplier;
+                updateCorners();
+                updateLevel8Hero2();
+                for (const t of mapTargets) {
+                    if (t.id !== '???' || t.status !== 'unlocked') continue;
+                    target.x = t.cx + shiftX - t.w/2;
+                    target.y = t.cy + shiftY - t.h/2;
+                    target.w = t.w; target.h = t.h;
+                    let ok1 = true, ok2 = true;
+                    for (const c of corners) if (c.x < target.x || c.x > target.x + target.w || c.y < target.y || c.y > target.y + target.h) ok1 = false;
+                    for (const c of corners2) if (c.x < target.x || c.x > target.x + target.w || c.y < target.y || c.y > target.y + target.h) ok2 = false;
+                    if (ok1 && ok2) { irisActive = true; irisRadius = Math.max(canvasW, canvasH); irisTargetEntry = t; }
+                }
+                return;
+            }
             if (gameState === 'INTRO') {
                 if (introPhase === 0) {
                     cameraPan += 12;
@@ -2895,10 +2951,10 @@
         }
 
         function loop() {
-            if (gameState === 'PLAYING' || gameState === 'MAP' || gameState === 'INTRO') {
+            if (gameState === 'PLAYING' || gameState === 'MAP' || gameState === 'INTRO' || gameState === 'MYSTERY') {
                 update();
                 draw();
-                if ((gameState === 'MAP' || gameState === 'INTRO') && corners2.length > 0) updateLevel8Hero2();
+                if ((gameState === 'MAP' || gameState === 'INTRO' || gameState === 'MYSTERY') && corners2.length > 0) updateLevel8Hero2();
             }
             requestAnimationFrame(loop);
         }
@@ -2966,7 +3022,14 @@
             const texts = { '1': '锚到成功', '2': '锚开二度', '3': '锚子戏法' };
             resultText.textContent = (texts[suffix] || '锚到成功') + '!';
             resultText.style.color = '#f0a500';
-            if (chapterIdx + 1 < CHAPTERS.length) {
+            if (ch.id === '3-3') {
+                resultBtn.textContent = '下一关？';
+                resultBtn.onclick = () => {
+                    resultOverlay.classList.add('hidden');
+                    gameState = 'MYSTERY';
+                    initMystery();
+                };
+            } else if (chapterIdx + 1 < CHAPTERS.length) {
                 resultBtn.textContent = '下一关';
                 resultBtn.onclick = () => {
                     chapterIdx++;
@@ -2986,14 +3049,15 @@
         }
 
         function showFailure() {
-            gameState = 'VICTORY';
             if (currentLevel === 14) {
-                resultText.textContent = '坚持了 ' + getSurvivalTimeStr();
-                resultText.style.color = '#f0a500';
-            } else {
-                resultText.textContent = FAILURE_TEXTS[Math.floor(Math.random() * FAILURE_TEXTS.length)] + '!';
-                resultText.style.color = '#ff4444';
+                gameState = 'MYSTERY';
+                if (survivalTime > bestTime) bestTime = survivalTime;
+                initMystery();
+                return;
             }
+            gameState = 'VICTORY';
+            resultText.textContent = FAILURE_TEXTS[Math.floor(Math.random() * FAILURE_TEXTS.length)] + '!';
+            resultText.style.color = '#ff4444';
             resultBtn.textContent = '重试';
             resultBtn.onclick = () => {
                 resultOverlay.classList.add('hidden');
@@ -3014,7 +3078,7 @@
             const positions = [];
             for (let row = 0; row < 3; row++) {
                 for (let col = 0; col < 3; col++) {
-                    positions.push({ x: canvasW * (0.2 + col * 0.33), y: canvasH * (0.2 + row * 0.33) });
+                    positions.push({ x: canvasW * (0.2 + col * 0.33), y: canvasH * (0.18 + row * 0.32) });
                 }
             }
             [positions[3], positions[5]] = [positions[5], positions[3]];
@@ -3070,7 +3134,7 @@
             ctx.strokeRect(canvasW * 0.2 - tw / 2, targetY - th / 2, tw, th);
             ctx.setLineDash([]);
             ctx.fillStyle = 'rgba(255,255,255,0.5)';
-            ctx.font = 'bold 64px "Segoe UI", sans-serif';
+            ctx.font = 'bold ' + MAP_FONT + 'px "Segoe UI", sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText('1-1', canvasW * 0.2, targetY);
 
@@ -3096,7 +3160,7 @@
             if (rightY > -200) {
                 const rx = canvasW / 2 + 30;
                 ctx.fillStyle = 'rgba(255,255,255,0.85)';
-                ctx.font = '64px "Segoe UI", sans-serif';
+                ctx.font = MAP_FONT + 'px "Segoe UI", sans-serif';
                 ctx.textBaseline = 'middle';
                 ctx.fillText('\u7684\u5927', rx - 70, rightY);
                 if (fakeAnchorLoaded && fakeAnchorImg.width > 1) {
@@ -3168,12 +3232,102 @@
                     ctx.restore();
                 }
 
-                ctx.fillStyle = t.status === 'completed' ? '#f0a500' : 'rgba(255,255,255,0.5)';
-                ctx.font = 'bold 64px "Segoe UI", sans-serif';
+            ctx.fillStyle = t.status === 'completed' ? '#f0a500' : 'rgba(255,255,255,0.5)';
+                ctx.font = 'bold ' + MAP_FONT + 'px \"Segoe UI\", sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(t.id, t.cx, t.cy);
                 ctx.textBaseline = 'alphabetic';
+            }
+        }
+
+        function initMystery() {
+            heroMotion = 'rotate';
+            hero2Motion = 'scale';
+            initMap();
+            mapTargets.push({
+                cx: canvasW + 80, cy: canvasH * 0.2,
+                w: W * 1.6, h: H * 1.6,
+                status: 'unlocked', id: '???', level: 14, idx: mapTargets.length,
+            });
+            const t3 = mapTargets.find(t => t.id === '3-3');
+            const cx = t3 ? t3.cx : canvasW * 0.8;
+            const cy = t3 ? t3.cy : canvasH * 0.8;
+            corners = [
+                { x: cx - W/2, y: cy - H/2 }, { x: cx + W/2, y: cy - H/2 },
+                { x: cx + W/2, y: cy + H/2 }, { x: cx - W/2, y: cy + H/2 },
+            ];
+            anchorIdx = 4; angle = 0;
+            anchorPos = { x: cx, y: cy };
+            recomputeBaseOffsets();
+            corners2 = [
+                { x: cx - W/2, y: cy - H/2 }, { x: cx + W/2, y: cy - H/2 },
+                { x: cx + W/2, y: cy + H/2 }, { x: cx - W/2, y: cy + H/2 },
+            ];
+            scaleAnchorIdx2 = 4;
+            scaleValue2 = 0.5; scalePhase2 = 0; scaleDir2 = 1;
+            recomputeScaleOffsets2();
+            state = 'ROTATING'; state2 = 'ROTATING';
+            shiftX = 0; shiftY = 0; mysteryAnchor = false;
+            backBtn.classList.remove('hidden');
+        }
+
+        function drawMystery() {
+            for (let i = 0; i < mapTargets.length; i++) {
+                const t = mapTargets[i];
+                const tx = t.cx + shiftX, ty = t.cy + shiftY;
+                if (tx + t.w/2 < 0 || tx - t.w/2 > canvasW || ty + t.h/2 < 0 || ty - t.h/2 > canvasH) continue;
+                if (i > 0) {
+                    const prev = mapTargets[i-1];
+                    const px = prev.cx + shiftX, py = prev.cy + shiftY;
+                    ctx.beginPath();
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(tx, ty);
+                    ctx.strokeStyle = t.status === 'completed' ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 4]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                ctx.beginPath();
+                ctx.rect(tx - t.w/2, ty - t.h/2, t.w, t.h);
+                if (t.status === 'completed') { ctx.fillStyle = 'rgba(240,165,0,0.2)'; ctx.fill(); }
+                ctx.strokeStyle = t.status === 'completed' ? '#f0a500' : (t.id === '???' ? 'rgba(240,165,0,0.6)' : 'rgba(240,165,0,0.4)');
+                ctx.lineWidth = 2;
+                ctx.setLineDash(t.status === 'completed' ? [] : [6, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = t.status === 'completed' ? '#f0a500' : 'rgba(255,255,255,0.5)';
+                ctx.font = 'bold ' + MAP_FONT + 'px \"Segoe UI\", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(t.id, tx, ty);
+                ctx.textBaseline = 'alphabetic';
+            }
+            const orig1 = corners.map(c => ({...c}));
+            const orig2 = corners2.map(c => ({...c}));
+            for (const c of corners) { c.x += shiftX; c.y += shiftY; }
+            for (const c of corners2) { c.x += shiftX; c.y += shiftY; }
+            drawRect();
+            drawHero2();
+            for (let i = 0; i < 4; i++) { corners[i] = orig1[i]; corners2[i] = orig2[i]; }
+            if (mysteryAnchor) drawMysteryAnchors();
+        }
+
+        function drawMysteryAnchors() {
+            const tcx = canvasW / 2, tcy = canvasH / 2;
+            const dirs = [
+                { x: tcx, y: tcy - 40, dx: 0, dy: -1 },
+                { x: tcx, y: tcy + 40, dx: 0, dy: 1 },
+                { x: tcx - 40, y: tcy, dx: -1, dy: 0 },
+                { x: tcx + 40, y: tcy, dx: 1, dy: 0 },
+            ];
+            for (const d of dirs) {
+                const hovered = Math.abs(mousePos.x - d.x) < 14 && Math.abs(mousePos.y - d.y) < 14;
+                ctx.beginPath(); ctx.arc(d.x, d.y, hovered ? 10 : 7, 0, Math.PI * 2);
+                ctx.fillStyle = hovered ? '#5dfcd1' : '#4ecdc4';
+                ctx.strokeStyle = '#3db8a8'; ctx.lineWidth = 2;
+                ctx.fill(); ctx.stroke();
             }
         }
 
@@ -3212,6 +3366,16 @@
                 titleOverlay.classList.add('hidden');
                 startLevel(lvl);
             });
+        });
+
+        document.querySelector('.mystery-btn').addEventListener('click', e => {
+            e.stopPropagation();
+            completedChapters = {};
+            for (let i = 0; i < CHAPTERS.length; i++) completedChapters[CHAPTERS[i].id] = true;
+            chapterIdx = CHAPTERS.length;
+            titleOverlay.classList.add('hidden');
+            gameState = 'MYSTERY';
+            initMystery();
         });
 
         /* ── Level Selection ── */
