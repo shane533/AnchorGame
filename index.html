@@ -6,7 +6,6 @@
     <meta name="theme-color" content="#1a1a2e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="manifest" href="manifest.json">
     <title>Anchor Game</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -489,6 +488,7 @@
         ];
         let completedChapters = {};
         let mapTargets = [];
+        let mapEntryCooldown = 0;
         let mapPhase = 0;
         let tutPhase = 0;
         let target = { x: 0, y: 0, w: W * TARGET_SCALE, h: H * TARGET_SCALE };
@@ -511,8 +511,6 @@
 
         const initScale = window.innerWidth < 500 ? 0.35 : 0.5;
         applyScale(initScale);
-        scaleSlider.value = Math.round(initScale * 100);
-        scaleVal.textContent = scaleSlider.value + '%';
 
         const anchorImg = new Image();
         anchorImg.src = 'anchor.webp';
@@ -524,13 +522,14 @@
         };
 
         function analyzeTransparency() {
-            const w = anchorImg.width;
-            const h = anchorImg.height;
-            const tc = document.createElement('canvas');
-            tc.width = w; tc.height = h;
-            const tctx = tc.getContext('2d');
-            tctx.drawImage(anchorImg, 0, 0);
-            const d = tctx.getImageData(0, 0, w, h).data;
+            try {
+                const w = anchorImg.width;
+                const h = anchorImg.height;
+                const tc = document.createElement('canvas');
+                tc.width = w; tc.height = h;
+                const tctx = tc.getContext('2d');
+                tctx.drawImage(anchorImg, 0, 0);
+                const d = tctx.getImageData(0, 0, w, h).data;
             let minX = w, minY = h, maxX = 0, maxY = 0;
             for (let y = 0; y < h; y++) {
                 for (let x = 0; x < w; x++) {
@@ -550,6 +549,7 @@
                     bottom: maxY / h,
                 };
             }
+            } catch (e) { /* file:// CORS */ }
         }
 
         const trapImg = new Image();
@@ -1775,10 +1775,7 @@
                 if (corners2.length > 0) state2 = 'ROTATING';
             }
 
-            if (gameState === 'MYSTERY') {
-                mysteryAnchor = !mysteryAnchor;
-                return;
-            }
+            
 
             if ((currentLevel === 12 || currentLevel === 13) && pos.x >= target.x && pos.x <= target.x + target.w && pos.y >= target.y && pos.y <= target.y + target.h) {
                 mouseDown = true;
@@ -1880,15 +1877,6 @@
                     else { targetVY = dy > 0 ? 1 : -1; targetVX = 0; }
                 }
                 targetPaused = false;
-            } else if (gameState === 'MYSTERY' && mysteryAnchor) {
-                const tcx = canvasW / 2, tcy = canvasH / 2;
-                const dx = pos.x - tcx, dy = pos.y - tcy;
-                if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
-                    const step = W * 1.5;
-                    if (Math.abs(dx) > Math.abs(dy)) shiftX += dx > 0 ? step : -step;
-                    else shiftY += dy > 0 ? step : -step;
-                }
-                mysteryAnchor = false;
             } else {
                 const near = findNearVertex(pos);
                 if (near !== -1) {
@@ -1977,11 +1965,7 @@
                 else if (state2 === 'PAUSED') drawVertices2();
                 return;
             }
-            if (gameState === 'MYSTERY') {
-                drawMystery();
-                drawFloatingTexts();
-                return;
-            }
+            
             if (currentLevel === 9) drawLevel9();
             else if (currentLevel === 3 || currentLevel === 6 || currentLevel === 10) { drawTarget(); drawLevel3Traps(); }
             else if (currentLevel === 4) { drawTarget(); drawLevel4Traps(); }
@@ -2509,7 +2493,8 @@
             }
 
             if (state === 'ROTATING' && cooldownTimer <= 0) {
-            if (gameState === 'MAP' || gameState === 'MYSTERY') {
+                if (gameState === 'MAP') {
+                    let inTarget = false;
                     for (const t of mapTargets) {
                         if (t.status !== 'unlocked') continue;
                         target.x = t.cx - t.w / 2;
@@ -2520,77 +2505,20 @@
                         if (corners2.length > 0) {
                             for (const c of corners2) {
                                 if (c.x < target.x || c.x > target.x + target.w || c.y < target.y || c.y > target.y + target.h) ok2 = false;
-        }
-
-        let shiftX = 0, shiftY = 0;
-        let mysteryAnchor = false;
-
-        function initMystery() {
-            heroMotion = 'rotate';
-            hero2Motion = 'scale';
-            initMap();
-            // Add ? target at right edge near 1-3 row
-            mapTargets.push({
-                cx: canvasW + 50, cy: canvasH * 0.2,
-                w: W * 1.4, h: H * 1.4,
-                status: 'unlocked', id: '?', level: 2, idx: mapTargets.length,
-            });
-            // Both heroes at center with locked anchors
-            const cx3 = canvasW * 0.5, cy3 = canvasH * 0.5;
-            corners = [
-                { x: cx3 - W / 2, y: cy3 - H / 2 },
-                { x: cx3 + W / 2, y: cy3 - H / 2 },
-                { x: cx3 + W / 2, y: cy3 + H / 2 },
-                { x: cx3 - W / 2, y: cy3 + H / 2 },
-            ];
-            anchorIdx = 4; angle = 0;
-            anchorPos = { x: cx3, y: cy3 };
-            recomputeBaseOffsets();
-            corners2 = corners.map(c => ({ ...c }));
-            scaleAnchorIdx2 = 2;
-            scaleValue2 = 0.5; scalePhase2 = 0; scaleDir2 = 1;
-            recomputeScaleOffsets2();
-            state = 'ROTATING'; state2 = 'ROTATING';
-            shiftX = 0; shiftY = 0;
-            mysteryAnchor = false;
-        }
-
-        function drawMystery() {
-            drawMapTargets();
-            for (const t of mapTargets) t.cx += shiftX, t.cy += shiftY;
-            drawRect();
-            drawHero2();
-            if (mysteryAnchor) drawMysteryAnchors();
-            for (const t of mapTargets) t.cx -= shiftX, t.cy -= shiftY;
-        }
-
-        function drawMysteryAnchors() {
-            const tcx = canvasW / 2, tcy = canvasH / 2;
-            const dirs = [
-                { x: tcx, y: tcy - 40, dx: 0, dy: -1 },
-                { x: tcx, y: tcy + 40, dx: 0, dy: 1 },
-                { x: tcx - 40, y: tcy, dx: -1, dy: 0 },
-                { x: tcx + 40, y: tcy, dx: 1, dy: 0 },
-            ];
-            for (const d of dirs) {
-                ctx.beginPath();
-                ctx.arc(d.x, d.y, 7, 0, Math.PI * 2);
-                ctx.fillStyle = '#4ecdc4'; ctx.strokeStyle = '#3db8a8'; ctx.lineWidth = 2;
-                ctx.fill(); ctx.stroke();
-            }
-            ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.font = '14px \"Segoe UI\", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('Layout Anchor', tcx, tcy - 60);
-        }
+                            }
                         }
                         if (ok1 && ok2) {
-                            chapterIdx = t.idx;
-                            currentLevel = t.level;
-                            startLevel(t.level);
-                            return;
+                            inTarget = true;
+                            if (mapEntryCooldown > 0) mapEntryCooldown--;
+                            else {
+                                chapterIdx = t.idx;
+                                currentLevel = t.level;
+                                startLevel(t.level);
+                                return;
+                            }
                         }
                     }
+                    if (!inTarget) mapEntryCooldown = 10;
                 } else if (currentLevel === 3) {
                     if (checkSuccess()) { score++; showVictory(); }
                     else if (checkLevel3Failure()) {
@@ -2600,8 +2528,6 @@
                 } else if (currentLevel === 10) {
                     if (checkSuccess()) { score++; showVictory(); }
                     else if (checkLevel10Failure()) {
-                        const cx = (corners[0].x + corners[2].x) / 2;
-                        const cy = (corners[0].y + corners[2].y) / 2;
                         showFailure();
                         cooldownTimer = COOLDOWN_FRAMES;
                     }
@@ -2676,10 +2602,10 @@
         }
 
         function loop() {
-            if (gameState === 'PLAYING' || gameState === 'MAP' || gameState === 'MYSTERY') {
+            if (gameState === 'PLAYING' || gameState === 'MAP' ) {
                 update();
                 draw();
-                if ((gameState === 'MAP' || gameState === 'MYSTERY') && corners2.length > 0) updateLevel8Hero2();
+                if ((gameState === 'MAP' ) && corners2.length > 0) updateLevel8Hero2();
             }
             requestAnimationFrame(loop);
         }
@@ -2711,6 +2637,8 @@
 
         const scaleSlider = document.getElementById('scaleSlider');
         const scaleVal = document.getElementById('scaleVal');
+        scaleSlider.value = Math.round(initScale * 100);
+        scaleVal.textContent = scaleSlider.value + '%';
         scaleSlider.addEventListener('input', () => {
             const pct = parseInt(scaleSlider.value);
             scaleVal.textContent = pct + '%';
@@ -2745,14 +2673,7 @@
             const texts = { '1': '锚到成功', '2': '锚开二度', '3': '锚子戏法' };
             resultText.textContent = (texts[suffix] || '锚到成功') + '!';
             resultText.style.color = '#f0a500';
-            if (ch.id === '3-3') {
-                resultBtn.textContent = '下一关？';
-                resultBtn.onclick = () => {
-                    resultOverlay.classList.add('hidden');
-                    gameState = 'MYSTERY';
-                    initMystery();
-                };
-            } else if (chapterIdx + 1 < CHAPTERS.length) {
+            if (chapterIdx + 1 < CHAPTERS.length) {
                 resultBtn.textContent = '下一关';
                 resultBtn.onclick = () => {
                     chapterIdx++;
@@ -2786,14 +2707,15 @@
         function initMap() {
             heroMotion = chapterIdx >= 3 && chapterIdx < 6 ? 'scale' : 'rotate';
             state = 'ROTATING';
+            mapEntryCooldown = 10;
             backBtn.classList.add('hidden');
             mapTargets = [];
-            const w = W * 1.4, h = H * 1.4;
+            const w = W * 1.6, h = H * 1.6;
 
             const positions = [];
             for (let row = 0; row < 3; row++) {
                 for (let col = 0; col < 3; col++) {
-                    positions.push({ x: canvasW * (0.2 + col * 0.3), y: canvasH * (0.2 + row * 0.3) });
+                    positions.push({ x: canvasW * (0.2 + col * 0.33), y: canvasH * (0.2 + row * 0.33) });
                 }
             }
             [positions[3], positions[5]] = [positions[5], positions[3]];
@@ -2903,6 +2825,7 @@
 
         const titleOverlay = document.getElementById('titleOverlay');
         titleOverlay.addEventListener('click', () => {
+            console.log('title clicked');
             titleOverlay.classList.add('hidden');
             gameState = 'MAP';
             initMap();
@@ -2979,8 +2902,15 @@
         canvasH = canvas.height;
         window.addEventListener('resize', resize);
         loop();
-        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
-
+        if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        }
+    </script>
+    <div class="landscape-hint" id="landscapeHint">
+        <div class="landscape-icon"></div>
+        <div>请旋转设备至横屏以获得最佳体验</div>
+    </div>
+    <script>
         const landscapeHint = document.getElementById('landscapeHint');
         function checkOrientation() {
             const isPortrait = window.innerWidth < window.innerHeight;
@@ -2998,9 +2928,5 @@
             screen.orientation.lock('landscape').catch(() => {});
         }
     </script>
-    <div class="landscape-hint" id="landscapeHint">
-        <div class="landscape-icon"></div>
-        <div>请旋转设备至横屏以获得最佳体验</div>
-    </div>
 </body>
 </html>
