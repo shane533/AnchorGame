@@ -522,7 +522,7 @@
         let scaleBaseOffsets2 = [];
 
         function computeScale() {
-            return Math.max(0.25, Math.min(0.5, window.innerHeight / 1860));
+            return Math.max(0.15, Math.min(0.45, window.innerHeight / 1800));
         }
         const initScale = computeScale();
         applyScale(initScale);
@@ -3004,8 +3004,6 @@
 
         function initMap() {
             applyScale(computeScale());
-            document.getElementById('info').textContent =
-                'H=' + window.innerHeight + ' scale=' + scaleFactor.toFixed(3) + ' W=' + W + ' target=' + Math.round(W * 1.6);
             heroMotion = chapterIdx >= 3 && chapterIdx < 6 ? 'scale' : 'rotate';
             state = 'ROTATING';
             mapEntryCooldown = 10;
