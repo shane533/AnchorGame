@@ -512,7 +512,10 @@
         let scaleValue2 = 0.5, scalePhase2 = 0, scaleAnchorIdx2 = 2, scaleDir2 = 1;
         let scaleBaseOffsets2 = [];
 
-        const initScale = Math.max(0.25, Math.min(0.5, window.innerHeight / 1860));
+        function computeScale() {
+            return Math.max(0.25, Math.min(0.5, window.innerHeight / 1860));
+        }
+        const initScale = computeScale();
         applyScale(initScale);
 
         const anchorImg = new Image();
@@ -2761,6 +2764,7 @@
         }
 
         function initMap() {
+            applyScale(computeScale());
             heroMotion = chapterIdx >= 3 && chapterIdx < 6 ? 'scale' : 'rotate';
             state = 'ROTATING';
             mapEntryCooldown = 10;
