@@ -2,7 +2,11 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
     <title>Anchor Game</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -209,7 +213,7 @@
         }
         .back-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
         .back-btn.hidden { display: none; }
-        .victory-overlay {
+        .result-overlay {
             display: flex;
             position: fixed;
             inset: 0;
@@ -218,8 +222,8 @@
             justify-content: center;
             background: rgba(0,0,0,0.6);
         }
-        .victory-overlay.hidden { display: none; }
-        .victory-card {
+        .result-overlay.hidden { display: none; }
+        .result-card {
             background: rgba(20,20,50,0.95);
             border: 2px solid rgba(240,165,0,0.4);
             border-radius: 16px;
@@ -227,15 +231,21 @@
             text-align: center;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 12px;
             backdrop-filter: blur(8px);
+            min-width: 240px;
         }
-        .victory-title {
+        .result-title {
             font-size: 28px;
             font-weight: 700;
             color: #f0a500;
         }
-        .victory-btn {
+        .result-text {
+            font-size: 28px;
+            font-weight: 700;
+            color: #f0a500;
+        }
+        .result-btn {
             padding: 12px 32px;
             border: 2px solid #f0a500;
             border-radius: 10px;
@@ -246,7 +256,7 @@
             font-family: inherit;
             transition: background 0.2s, transform 0.1s;
         }
-        .victory-btn:hover { background: rgba(240,165,0,0.3); transform: scale(1.04); }
+        .result-btn:hover { background: rgba(240,165,0,0.3); transform: scale(1.04); }
         .debug-panel {
             position: fixed;
             left: 8px;
@@ -273,6 +283,45 @@
             transition: background 0.15s, color 0.15s;
         }
         .debug-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+        .landscape-hint {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(0,0,0,0.9);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            color: #fff;
+            font-size: 20px;
+            text-align: center;
+        }
+        .landscape-hint.show { display: flex; }
+        .landscape-icon {
+            width: 80px;
+            height: 60px;
+            border: 3px solid #fff;
+            border-radius: 8px;
+            animation: rotate-hint 2s ease-in-out infinite;
+        }
+        @keyframes rotate-hint {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+
+        @media (max-width: 768px) {
+            .debug-panel { display: none; }
+            .title-text { font-size: 40px; }
+            .title-icon { width: 80px; height: 80px; }
+        }
+        @media (max-width: 480px) {
+            .title-text { font-size: 28px; }
+            .title-icon { width: 56px; height: 56px; }
+            .title-sub { font-size: 14px; }
+            .settings-btn { width: 30px; height: 30px; font-size: 14px; }
+        }
     </style>
 </head>
 <body>
@@ -286,10 +335,10 @@
         <div class="title-sub">点击任意位置开始</div>
     </div>
     <div class="menu-overlay hidden" id="menuOverlay"></div>
-    <div class="victory-overlay hidden" id="victoryOverlay">
-        <div class="victory-card">
-            <div class="victory-title">关卡通过!</div>
-            <button class="victory-btn" id="victoryBtn">下一关</button>
+    <div class="result-overlay hidden" id="resultOverlay">
+        <div class="result-card">
+            <div class="result-text" id="resultText"></div>
+            <button class="result-btn" id="resultBtn">下一关</button>
         </div>
     </div>
     <button class="back-btn hidden" id="backBtn">← 返回选关</button>
@@ -302,7 +351,9 @@
             <button class="debug-btn" data-ch="4">2-2</button>
             <button class="debug-btn" data-ch="5">2-3</button>
             <button class="debug-btn" data-ch="6">3-1</button>
-            <button class="debug-btn" data-ch="7">4-1</button>
+            <button class="debug-btn" data-ch="7">3-2</button>
+            <button class="debug-btn" data-ch="8">3-3</button>
+            <button class="debug-btn" data-ch="9">4-1</button>
         </div>
         <div class="debug-col">
             <button class="debug-btn enter-btn" data-lvl="3">L1-1</button>
@@ -311,7 +362,9 @@
             <button class="debug-btn enter-btn" data-lvl="6">L2-1</button>
             <button class="debug-btn enter-btn" data-lvl="7">L2-2</button>
             <button class="debug-btn enter-btn" data-lvl="11">L2-3</button>
-            <button class="debug-btn enter-btn" data-lvl="8">L3-1</button>
+            <button class="debug-btn enter-btn" data-lvl="12">L3-1</button>
+            <button class="debug-btn enter-btn" data-lvl="8">L3-2</button>
+            <button class="debug-btn enter-btn" data-lvl="13">L3-3</button>
             <button class="debug-btn enter-btn" data-lvl="9">L4-1</button>
         </div>
     </div>
@@ -347,6 +400,8 @@
             if (currentLevel === 4) { resetLevel4(); return; }
             if (currentLevel === 10) { resetLevel10(); return; }
             if (currentLevel === 11) { resetLevel11(); return; }
+            if (currentLevel === 12) { resetLevel12(); return; }
+            if (currentLevel === 13) { resetLevel13(); return; }
             if (currentLevel === 6) { resetLevel6(); return; }
             if (currentLevel === 7) { resetLevel7(); return; }
             if (currentLevel === 8) { resetLevel8(); return; }
@@ -391,6 +446,10 @@
                     resetLevel10();
                 } else if (currentLevel === 11) {
                     resetLevel11();
+                } else if (currentLevel === 12) {
+                    resetLevel12();
+                } else if (currentLevel === 13) {
+                    resetLevel13();
                 } else if (currentLevel === 6) {
                     resetLevel6();
                 } else if (currentLevel === 7) {
@@ -420,7 +479,9 @@
             { id: '2-1', level: 6 },
             { id: '2-2', level: 7 },
             { id: '2-3', level: 11 },
-            { id: '3-1', level: 8 },
+            { id: '3-1', level: 12 },
+            { id: '3-2', level: 8 },
+            { id: '3-3', level: 13 },
             { id: '4-1', level: 9 },
         ];
         let completedChapters = {};
@@ -435,6 +496,7 @@
 
         let scaleValue = 0.5, scalePhase = 0, scaleAnchorIdx = 2, scaleDir = 1;
         let scaleBaseOffsets = [];
+        let targetPaused = false;
         const SCALE_SPEED = 0.02;
         const TOTAL_LEVELS = 9;
 
@@ -498,6 +560,11 @@
         infusedCoreImg.src = 'infused_core.webp';
         let infusedCoreLoaded = false;
         infusedCoreImg.onload = () => { infusedCoreLoaded = true; };
+
+        const stoneCrackerImg = new Image();
+        stoneCrackerImg.src = 'stone_cracker.webp';
+        let stoneCrackerLoaded = false;
+        stoneCrackerImg.onload = () => { stoneCrackerLoaded = true; };
 
         let corners = [];
         let baseOffsets = [];
@@ -1437,6 +1504,160 @@
             cooldownTimer = 0;
         }
 
+        let targetVX = 0, targetVY = 1;
+
+        function initLevel12() {
+            heroMotion = 'rotate';
+            hero2Motion = 'scale';
+            const cx1 = canvasW * 0.2;
+            const cx2 = canvasW * 0.8;
+            const cy = canvasH / 2;
+            corners = [
+                { x: cx1 - W / 2, y: cy - H / 2 },
+                { x: cx1 + W / 2, y: cy - H / 2 },
+                { x: cx1 + W / 2, y: cy + H / 2 },
+                { x: cx1 - W / 2, y: cy + H / 2 },
+            ];
+            anchorIdx = 0; angle = 0;
+            anchorPos = { ...corners[anchorIdx] };
+            recomputeBaseOffsets();
+
+            corners2 = [
+                { x: cx2 - W / 2, y: cy - H / 2 },
+                { x: cx2 + W / 2, y: cy - H / 2 },
+                { x: cx2 + W / 2, y: cy + H / 2 },
+                { x: cx2 - W / 2, y: cy + H / 2 },
+            ];
+            scaleAnchorIdx2 = 2;
+            scaleValue2 = 0.5; scalePhase2 = 0; scaleDir2 = 1;
+            recomputeScaleOffsets2();
+
+            target.x = canvasW / 2 - (W * TARGET_SCALE) / 2;
+            target.y = cy - (H * TARGET_SCALE) / 2;
+            target.w = W * TARGET_SCALE;
+            target.h = H * TARGET_SCALE;
+            targetVX = 0; targetVY = 1;
+            targetPaused = false;
+            state = 'ROTATING'; state2 = 'ROTATING';
+        }
+
+        function updateLevel12Target() {
+            if (targetPaused) return;
+            const speed = 1.2;
+            target.x += targetVX * speed;
+            target.y += targetVY * speed;
+            if (target.x < 0 || target.x + target.w > canvasW) targetVX *= -1;
+            if (target.y < 0 || target.y + target.h > canvasH) targetVY *= -1;
+        }
+
+        function checkLevel12Success() {
+            const { x, y, w, h } = target;
+            for (const c of corners) if (c.x < x || c.x > x + w || c.y < y || c.y > y + h) return false;
+            for (const c of corners2) if (c.x < x || c.x > x + w || c.y < y || c.y > y + h) return false;
+            return true;
+        }
+
+        function resetLevel12() {
+            initLevel12();
+            cooldownTimer = 0;
+        }
+
+        function initLevel13() {
+            heroMotion = 'rotate';
+            hero2Motion = 'scale';
+            const cx1 = canvasW * 0.12;
+            const cx2 = canvasW * 0.25;
+            const cy = canvasH / 2;
+            corners = [
+                { x: cx1 - W / 2, y: cy - H / 2 },
+                { x: cx1 + W / 2, y: cy - H / 2 },
+                { x: cx1 + W / 2, y: cy + H / 2 },
+                { x: cx1 - W / 2, y: cy + H / 2 },
+            ];
+            anchorIdx = 0; angle = 0;
+            anchorPos = { ...corners[anchorIdx] };
+            recomputeBaseOffsets();
+
+            corners2 = [
+                { x: cx2 - W / 2, y: cy - H / 2 },
+                { x: cx2 + W / 2, y: cy - H / 2 },
+                { x: cx2 + W / 2, y: cy + H / 2 },
+                { x: cx2 - W / 2, y: cy + H / 2 },
+            ];
+            scaleAnchorIdx2 = 2;
+            scaleValue2 = 0.5; scalePhase2 = 0; scaleDir2 = 1;
+            recomputeScaleOffsets2();
+
+            target.x = canvasW * 0.75 - (W * TARGET_SCALE) / 2;
+            target.y = cy - (H * TARGET_SCALE) / 2;
+            target.w = W * TARGET_SCALE;
+            target.h = H * TARGET_SCALE;
+            targetVX = 0; targetVY = 1;
+            targetPaused = false;
+
+            generateLevel13Traps();
+            state = 'ROTATING'; state2 = 'ROTATING';
+        }
+
+        function generateLevel13Traps() {
+            traps = [];
+            const hw = L2_TW / 2, hh = L2_TH / 2;
+            const colX1 = canvasW * 0.44;
+            const colX2 = canvasW * 0.52;
+            const rows = 6;
+            const stepY = canvasH / (rows + 1);
+
+            const cos90 = 0, sin90 = 1;
+            for (let r = 0; r < rows; r++) {
+                const cy = stepY * (r + 1);
+                const crn1 = [
+                    { x: colX1 - hw, y: cy - hh },
+                    { x: colX1 + hw, y: cy - hh },
+                    { x: colX1 + hw, y: cy + hh },
+                    { x: colX1 - hw, y: cy + hh },
+                ];
+                const rc1 = crn1.map(c => ({
+                    x: colX1 + (c.x - colX1) * cos90 - (c.y - cy) * sin90,
+                    y: cy + (c.x - colX1) * sin90 + (c.y - cy) * cos90,
+                }));
+                traps.push({ w: L2_TW, h: L2_TH, motion: 'static', corners: rc1 });
+            }
+            for (let r = 0; r < rows; r++) {
+                const cy = stepY * (r + 1);
+                const crn2 = [
+                    { x: colX2 - hw, y: cy - hh },
+                    { x: colX2 + hw, y: cy - hh },
+                    { x: colX2 + hw, y: cy + hh },
+                    { x: colX2 - hw, y: cy + hh },
+                ];
+                const rc2 = crn2.map(c => ({
+                    x: colX2 + (c.x - colX2) * cos90 - (c.y - cy) * (-sin90),
+                    y: cy + (c.x - colX2) * (-sin90) + (c.y - cy) * cos90,
+                }));
+                traps.push({ w: L2_TW, h: L2_TH, motion: 'static', corners: rc2 });
+            }
+        }
+
+        function checkLevel13Failure() {
+            for (const t of traps) {
+                if (satOverlapPoly(corners, t.corners) >= OVERLAP_THRESHOLD) return true;
+                if (satOverlapPoly(corners2, t.corners) >= OVERLAP_THRESHOLD) return true;
+            }
+            return false;
+        }
+
+        function checkLevel13Success() {
+            const { x, y, w, h } = target;
+            for (const c of corners) if (c.x < x || c.x > x + w || c.y < y || c.y > y + h) return false;
+            for (const c of corners2) if (c.x < x || c.x > x + w || c.y < y || c.y > y + h) return false;
+            return true;
+        }
+
+        function resetLevel13() {
+            initLevel13();
+            cooldownTimer = 0;
+        }
+
         let alignAnchors = [];
         let hAlign = 'left', vAlign = 'top';
         let heroGX = 0, heroGY = 0;
@@ -1535,19 +1756,30 @@
                 }
             }
 
-            if (currentLevel === 8) {
-                if (pointInPolygon(pos, corners2)) {
-                    mouseDown = true;
-                    state2 = 'PAUSED';
-                    state = 'ROTATING';
-                    return;
-                }
-                if (pointInPolygon(pos, corners)) {
-                    mouseDown = true;
-                    state = 'PAUSED';
-                    state2 = 'ROTATING';
-                    return;
-                }
+            if (corners2.length > 0 && pointInPolygon(pos, corners2)) {
+                mouseDown = true;
+                state2 = 'PAUSED';
+                state = 'ROTATING';
+                return;
+            }
+
+            if (pointInPolygon(pos, corners)) {
+                mouseDown = true;
+                state = 'PAUSED';
+                if (corners2.length > 0) state2 = 'ROTATING';
+            }
+
+            if (gameState === 'MYSTERY') {
+                mysteryAnchor = !mysteryAnchor;
+                return;
+            }
+
+            if ((currentLevel === 12 || currentLevel === 13) && pos.x >= target.x && pos.x <= target.x + target.w && pos.y >= target.y && pos.y <= target.y + target.h) {
+                mouseDown = true;
+                targetPaused = true;
+                state = 'ROTATING';
+                if (corners2.length > 0) state2 = 'ROTATING';
+                return;
             }
 
             if (currentLevel === 9 && pointInPolygon(pos, corners)) {
@@ -1580,7 +1812,7 @@
             } else if (state === 'PAUSED') {
                 const near = findNearVertex(mousePos);
                 canvas.style.cursor = near !== -1 ? 'pointer' : 'default';
-            } else if (currentLevel === 8 && state2 === 'PAUSED') {
+            } else if (state2 === 'PAUSED') {
                 const near = findNearVertex2(mousePos);
                 canvas.style.cursor = near !== -1 ? 'pointer' : 'default';
             } else if (pausedTrap >= 0) {
@@ -1594,8 +1826,8 @@
                     }
                 }
                 canvas.style.cursor = over ? 'pointer' : 'default';
-            } else if (currentLevel === 8) {
-                canvas.style.cursor = (pointInPolygon(mousePos, corners) || pointInPolygon(mousePos, corners2)) ? 'pointer' : 'default';
+            } else if (currentLevel === 8 || currentLevel === 12) {
+                canvas.style.cursor = (pointInPolygon(mousePos, corners) || pointInPolygon(mousePos, corners2) || ((currentLevel === 12 || currentLevel === 13) && mousePos.x >= target.x && mousePos.x <= target.x + target.w && mousePos.y >= target.y && mousePos.y <= target.y + target.h)) ? 'pointer' : 'default';
             } else if (currentLevel === 9) {
                 canvas.style.cursor = pointInPolygon(mousePos, corners) ? 'pointer' : 'default';
             } else {
@@ -1619,7 +1851,7 @@
                 }
                 traps[pausedTrap].state = 'ROTATING';
                 pausedTrap = -1;
-            } else if (currentLevel === 8 && state2 === 'PAUSED') {
+            } else if (state2 === 'PAUSED') {
                 const near = findNearVertex2(pos);
                 if (near !== -1) setScaleAnchor2(near);
                 state2 = 'ROTATING';
@@ -1634,6 +1866,23 @@
                     }
                 }
                 state = 'ROTATING';
+            } else if ((currentLevel === 12 || currentLevel === 13) && targetPaused) {
+                const tcx = target.x + target.w / 2, tcy = target.y + target.h / 2;
+                const dx = pos.x - tcx, dy = pos.y - tcy;
+                if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+                    if (Math.abs(dx) > Math.abs(dy)) { targetVX = dx > 0 ? 1 : -1; targetVY = 0; }
+                    else { targetVY = dy > 0 ? 1 : -1; targetVX = 0; }
+                }
+                targetPaused = false;
+            } else if (gameState === 'MYSTERY' && mysteryAnchor) {
+                const tcx = canvasW / 2, tcy = canvasH / 2;
+                const dx = pos.x - tcx, dy = pos.y - tcy;
+                if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+                    const step = W * 1.5;
+                    if (Math.abs(dx) > Math.abs(dy)) shiftX += dx > 0 ? step : -step;
+                    else shiftY += dy > 0 ? step : -step;
+                }
+                mysteryAnchor = false;
             } else {
                 const near = findNearVertex(pos);
                 if (near !== -1) {
@@ -1663,6 +1912,7 @@
                 const dy = pos.y - corners[i].y;
                 if (dx * dx + dy * dy < VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS) return i;
             }
+            
             return -1;
         }
 
@@ -1672,6 +1922,7 @@
                 const dy = pos.y - corners2[i].y;
                 if (dx * dx + dy * dy < VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS) return i;
             }
+            
             return -1;
         }
 
@@ -1696,8 +1947,15 @@
             if (gameState === 'MAP') {
                 drawMapTargets();
                 drawRect();
+                if (corners2.length > 0) drawHero2();
                 drawFloatingTexts();
                 if (state === 'PAUSED') drawVertices();
+                else if (state2 === 'PAUSED') drawVertices2();
+                return;
+            }
+            if (gameState === 'MYSTERY') {
+                drawMystery();
+                drawFloatingTexts();
                 return;
             }
             if (currentLevel === 9) drawLevel9();
@@ -1705,12 +1963,14 @@
             else if (currentLevel === 4) { drawTarget(); drawLevel4Traps(); }
             else if (currentLevel === 7 || currentLevel === 11) { drawTarget(); drawLevel4Traps(); }
             else if (currentLevel === 8) { drawTarget(); drawLevel8Traps(); }
+            else if (currentLevel === 13) { drawTarget(); drawStoneTraps(); }
             else drawTarget();
             if (currentLevel !== 9) drawRect();
-            if (currentLevel === 8) drawHero2();
+            if (corners2.length > 0) drawHero2();
+            if ((currentLevel === 12 || currentLevel === 13) && targetPaused) drawTargetDirAnchors();
             drawFloatingTexts();
             if (state === 'PAUSED' && currentLevel !== 9) drawVertices();
-            else if (currentLevel === 8 && state2 === 'PAUSED') drawVertices2();
+            else if (state2 === 'PAUSED') drawVertices2();
             else if (pausedTrap >= 0) drawTrapVertices(traps[pausedTrap]);
         }
 
@@ -1937,6 +2197,32 @@
             }
         }
 
+        function drawTargetDirAnchors() {
+            const tcx = target.x + target.w / 2, tcy = target.y + target.h / 2;
+            const dirs = [
+                { x: tcx, y: tcy - 40, dx: 0, dy: -1 },
+                { x: tcx, y: tcy + 40, dx: 0, dy: 1 },
+                { x: tcx - 40, y: tcy, dx: -1, dy: 0 },
+                { x: tcx + 40, y: tcy, dx: 1, dy: 0 },
+            ];
+            for (const d of dirs) {
+                const hovered = Math.abs(mousePos.x - d.x) < 14 && Math.abs(mousePos.y - d.y) < 14;
+                const isActive = d.dx === targetVX && d.dy === targetVY;
+                ctx.beginPath();
+                ctx.arc(d.x, d.y, hovered ? 10 : 7, 0, Math.PI * 2);
+                if (isActive) {
+                    ctx.fillStyle = '#ff6b6b';
+                    ctx.strokeStyle = '#ff4444';
+                    ctx.lineWidth = 3;
+                } else {
+                    ctx.fillStyle = hovered ? '#5dfcd1' : '#4ecdc4';
+                    ctx.strokeStyle = '#3db8a8';
+                    ctx.lineWidth = 2;
+                }
+                ctx.fill(); ctx.stroke();
+            }
+        }
+
         function drawTarget() {
             if (cooldownTimer > 0) return;
 
@@ -1954,13 +2240,16 @@
             const pad = Math.min(target.w, target.h) * 0.15;
             const innerH = target.h - pad * 2;
             const innerW = target.w - pad * 2;
-            const showFake = heroMotion === 'scale' || currentLevel === 8;
-            const showAnchor = heroMotion !== 'scale' || currentLevel === 8;
+            const hasHero2 = corners2.length > 0 && hero2Motion !== 'none' && hero2Motion !== 'align';
+            const showFake = heroMotion === 'scale' || hasHero2;
+            const showAnchor = heroMotion !== 'scale' || hasHero2;
+
+            const both = showFake && showAnchor;
 
             if (showAnchor && imgLoaded && anchorImg.width > 1) {
                 const h = innerH;
                 const w = h * anchorImg.width / anchorImg.height;
-                const sx = currentLevel === 8 ? target.x + target.w / 2 - innerW * 0.1 - w / 2 : target.x + pad;
+                const sx = both ? target.x + target.w / 2 - innerW * 0.1 - w / 2 : target.x + pad;
                 ctx.save(); ctx.globalAlpha = 0.10;
                 ctx.drawImage(anchorImg, sx, target.y + (target.h - h) / 2, w, h);
                 ctx.restore();
@@ -1969,7 +2258,7 @@
             if (showFake && fakeAnchorLoaded && fakeAnchorImg.width > 1) {
                 const h = innerH;
                 const w = h * fakeAnchorImg.width / fakeAnchorImg.height;
-                const sx = currentLevel === 8 ? target.x + target.w / 2 + innerW * 0.1 - w / 2 : target.x + pad;
+                const sx = both ? target.x + target.w / 2 + innerW * 0.1 - w / 2 : target.x + pad;
                 ctx.save(); ctx.globalAlpha = 0.10;
                 ctx.drawImage(fakeAnchorImg, sx, target.y + (target.h - h) / 2, w, h);
                 ctx.restore();
@@ -2010,6 +2299,33 @@
                 const maxX = Math.max(...t.corners.map(c => c.x));
                 drawTrapImage(minX, minY, maxX - minX, t.h);
             }
+        }
+
+        function drawStoneTraps() {
+            for (const t of traps) {
+                if (!stoneCrackerLoaded || stoneCrackerImg.width <= 1) {
+                    const minX = Math.min(...t.corners.map(c => c.x));
+                    const minY = Math.min(...t.corners.map(c => c.y));
+                    const maxX = Math.max(...t.corners.map(c => c.x));
+                    drawTrapImage(minX, minY, maxX - minX, t.h);
+                } else {
+                    drawTrapWarpedStone(t.corners);
+                }
+            }
+        }
+
+        function drawTrapWarpedStone(p) {
+            const iw = stoneCrackerImg.width || 1, ih = stoneCrackerImg.height || 1;
+            ctx.save();
+            if (stoneCrackerLoaded && iw > 1 && ih > 1) {
+                const a = (p[1].x - p[0].x) / iw;
+                const b = (p[1].y - p[0].y) / iw;
+                const c = (p[3].x - p[0].x) / ih;
+                const d = (p[3].y - p[0].y) / ih;
+                ctx.setTransform(a, b, c, d, p[0].x, p[0].y);
+                ctx.drawImage(stoneCrackerImg, 0, 0, iw, ih, 0, 0, iw, ih);
+            }
+            ctx.restore();
         }
 
         function drawTrapImage(tx, ty, tw, th) {
@@ -2144,10 +2460,10 @@
         function update() {
             if (currentLevel === 9) { updateLevel9Motion(); }
             else {
-                if (currentLevel === 8) {
+                if (currentLevel === 8 || currentLevel === 12 || currentLevel === 13) {
                 if (state === 'ROTATING') angle += ROTATION_SPEED * speedMultiplier;
                 updateCorners();
-                updateLevel8Hero2();
+                if (state2) updateLevel8Hero2();
             } else if (heroMotion === 'scale') {
                 if (state === 'ROTATING') {
                     scalePhase += scaleDir * SCALE_SPEED * speedMultiplier;
@@ -2164,17 +2480,87 @@
             if (currentLevel === 3 || currentLevel === 4 || currentLevel === 10) updateAllTraps();
             else if (currentLevel === 6) updateLevel6Traps();
             else if (currentLevel === 7 || currentLevel === 11) updateLevel7Traps();
-            else if (currentLevel === 8) updateLevel8Traps();
+            else if (currentLevel === 8) { updateLevel8Traps(); updateLevel12Target(); }
+            else if (currentLevel === 12 || currentLevel === 13) updateLevel12Target();
             }
 
             if (state === 'ROTATING' && cooldownTimer <= 0) {
-                if (gameState === 'MAP') {
+            if (gameState === 'MAP' || gameState === 'MYSTERY') {
                     for (const t of mapTargets) {
                         if (t.status !== 'unlocked') continue;
                         target.x = t.cx - t.w / 2;
                         target.y = t.cy - t.h / 2;
                         target.w = t.w; target.h = t.h;
-                        if (checkSuccess()) {
+                        const ok1 = checkSuccess();
+                        let ok2 = true;
+                        if (corners2.length > 0) {
+                            for (const c of corners2) {
+                                if (c.x < target.x || c.x > target.x + target.w || c.y < target.y || c.y > target.y + target.h) ok2 = false;
+        }
+
+        let shiftX = 0, shiftY = 0;
+        let mysteryAnchor = false;
+
+        function initMystery() {
+            heroMotion = 'rotate';
+            hero2Motion = 'scale';
+            initMap();
+            // Add ? target at right edge near 1-3 row
+            mapTargets.push({
+                cx: canvasW + 50, cy: canvasH * 0.2,
+                w: W * 1.4, h: H * 1.4,
+                status: 'unlocked', id: '?', level: 2, idx: mapTargets.length,
+            });
+            // Both heroes at center with locked anchors
+            const cx3 = canvasW * 0.5, cy3 = canvasH * 0.5;
+            corners = [
+                { x: cx3 - W / 2, y: cy3 - H / 2 },
+                { x: cx3 + W / 2, y: cy3 - H / 2 },
+                { x: cx3 + W / 2, y: cy3 + H / 2 },
+                { x: cx3 - W / 2, y: cy3 + H / 2 },
+            ];
+            anchorIdx = 4; angle = 0;
+            anchorPos = { x: cx3, y: cy3 };
+            recomputeBaseOffsets();
+            corners2 = corners.map(c => ({ ...c }));
+            scaleAnchorIdx2 = 2;
+            scaleValue2 = 0.5; scalePhase2 = 0; scaleDir2 = 1;
+            recomputeScaleOffsets2();
+            state = 'ROTATING'; state2 = 'ROTATING';
+            shiftX = 0; shiftY = 0;
+            mysteryAnchor = false;
+        }
+
+        function drawMystery() {
+            drawMapTargets();
+            for (const t of mapTargets) t.cx += shiftX, t.cy += shiftY;
+            drawRect();
+            drawHero2();
+            if (mysteryAnchor) drawMysteryAnchors();
+            for (const t of mapTargets) t.cx -= shiftX, t.cy -= shiftY;
+        }
+
+        function drawMysteryAnchors() {
+            const tcx = canvasW / 2, tcy = canvasH / 2;
+            const dirs = [
+                { x: tcx, y: tcy - 40, dx: 0, dy: -1 },
+                { x: tcx, y: tcy + 40, dx: 0, dy: 1 },
+                { x: tcx - 40, y: tcy, dx: -1, dy: 0 },
+                { x: tcx + 40, y: tcy, dx: 1, dy: 0 },
+            ];
+            for (const d of dirs) {
+                ctx.beginPath();
+                ctx.arc(d.x, d.y, 7, 0, Math.PI * 2);
+                ctx.fillStyle = '#4ecdc4'; ctx.strokeStyle = '#3db8a8'; ctx.lineWidth = 2;
+                ctx.fill(); ctx.stroke();
+            }
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.font = '14px \"Segoe UI\", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Layout Anchor', tcx, tcy - 60);
+        }
+                        }
+                        if (ok1 && ok2) {
                             chapterIdx = t.idx;
                             currentLevel = t.level;
                             startLevel(t.level);
@@ -2184,9 +2570,7 @@
                 } else if (currentLevel === 3) {
                     if (checkSuccess()) { score++; showVictory(); }
                     else if (checkLevel3Failure()) {
-                        const cx = (corners[0].x + corners[2].x) / 2;
-                        const cy = (corners[0].y + corners[2].y) / 2;
-                        floatingTexts.push({ x: cx, y: cy, opacity: 1, vy: -1.4, type: 'failure' });
+                        showFailure();
                         cooldownTimer = COOLDOWN_FRAMES;
                     }
                 } else if (currentLevel === 10) {
@@ -2194,7 +2578,7 @@
                     else if (checkLevel10Failure()) {
                         const cx = (corners[0].x + corners[2].x) / 2;
                         const cy = (corners[0].y + corners[2].y) / 2;
-                        floatingTexts.push({ x: cx, y: cy, opacity: 1, vy: -1.4, type: 'failure' });
+                        showFailure();
                         cooldownTimer = COOLDOWN_FRAMES;
                     }
                 } else if (currentLevel === 4) {
@@ -2202,7 +2586,7 @@
                     else if (checkLevel4Failure()) {
                         const cx = (corners[0].x + corners[2].x) / 2;
                         const cy = (corners[0].y + corners[2].y) / 2;
-                        floatingTexts.push({ x: cx, y: cy, opacity: 1, vy: -1.4, type: 'failure' });
+                        showFailure();
                         cooldownTimer = COOLDOWN_FRAMES;
                     }
                 } else if (currentLevel === 6) {
@@ -2210,7 +2594,7 @@
                     else if (checkLevel6Failure()) {
                         const cx = (corners[0].x + corners[2].x) / 2;
                         const cy = (corners[0].y + corners[2].y) / 2;
-                        floatingTexts.push({ x: cx, y: cy, opacity: 1, vy: -1.4, type: 'failure' });
+                        showFailure();
                         cooldownTimer = COOLDOWN_FRAMES;
                     }
                 } else if (currentLevel === 7 || currentLevel === 11) {
@@ -2218,7 +2602,7 @@
                     else if (currentLevel === 7 ? checkLevel7Failure() : checkLevel11Failure()) {
                         const cx = (corners[0].x + corners[2].x) / 2;
                         const cy = (corners[0].y + corners[2].y) / 2;
-                        floatingTexts.push({ x: cx, y: cy, opacity: 1, vy: -1.4, type: 'failure' });
+                        showFailure();
                         cooldownTimer = COOLDOWN_FRAMES;
                     }
                 } else if (currentLevel === 8) {
@@ -2226,7 +2610,17 @@
                     else if (checkLevel8Failure()) {
                         const cx = (corners[0].x + corners[2].x) / 2;
                         const cy = (corners[0].y + corners[2].y) / 2;
-                        floatingTexts.push({ x: cx, y: cy, opacity: 1, vy: -1.4, type: 'failure' });
+                        showFailure();
+                        cooldownTimer = COOLDOWN_FRAMES;
+                    }
+                } else if (currentLevel === 12) {
+                    if (checkLevel12Success()) { score++; showVictory(); }
+                } else if (currentLevel === 13) {
+                    if (checkLevel13Success()) { score++; showVictory(); }
+                    else if (checkLevel13Failure()) {
+                        const cx = (corners[0].x + corners[2].x) / 2;
+                        const cy = (corners[0].y + corners[2].y) / 2;
+                        showFailure();
                         cooldownTimer = COOLDOWN_FRAMES;
                     }
                 } else if (currentLevel === 9) {
@@ -2246,6 +2640,7 @@
                     else if (currentLevel === 7) resetLevel7();
                     else if (currentLevel === 11) resetLevel11();
                     else if (currentLevel === 8) resetLevel8();
+                    else if (currentLevel === 13) resetLevel13();
                 }
             }
 
@@ -2257,9 +2652,10 @@
         }
 
         function loop() {
-            if (gameState === 'PLAYING' || gameState === 'MAP') {
+            if (gameState === 'PLAYING' || gameState === 'MAP' || gameState === 'MYSTERY') {
                 update();
                 draw();
+                if ((gameState === 'MAP' || gameState === 'MYSTERY') && corners2.length > 0) updateLevel8Hero2();
             }
             requestAnimationFrame(loop);
         }
@@ -2303,38 +2699,77 @@
 
         /* ── Victory ── */
 
-        const victoryOverlay = document.getElementById('victoryOverlay');
-        const victoryBtn = document.getElementById('victoryBtn');
+        const resultOverlay = document.getElementById('resultOverlay');
+        const resultText = document.getElementById('resultText');
+        const resultBtn = document.getElementById('resultBtn');
+
+        const FAILURE_TEXTS = ['锚中出错', '手锚脚乱', '做锚不易', '锚里求死'];
 
         function showVictory() {
             score++;
             const ch = CHAPTERS[chapterIdx];
             completedChapters[ch.id] = true;
-            if (chapterIdx + 1 < CHAPTERS.length) chapterIdx++;
-            gameState = 'MAP';
-            initMap();
+            gameState = 'VICTORY';
+            const suffix = ch.id.split('-')[1];
+            const texts = { '1': '锚到成功', '2': '锚开二度', '3': '锚子戏法' };
+            resultText.textContent = (texts[suffix] || '锚到成功') + '!';
+            resultText.style.color = '#f0a500';
+            if (ch.id === '3-3') {
+                resultBtn.textContent = '下一关？';
+                resultBtn.onclick = () => {
+                    resultOverlay.classList.add('hidden');
+                    gameState = 'MYSTERY';
+                    initMystery();
+                };
+            } else if (chapterIdx + 1 < CHAPTERS.length) {
+                resultBtn.textContent = '下一关';
+                resultBtn.onclick = () => {
+                    chapterIdx++;
+                    resultOverlay.classList.add('hidden');
+                    gameState = 'MAP';
+                    initMap();
+                };
+            } else {
+                resultBtn.textContent = '回到主界面';
+                resultBtn.onclick = () => {
+                    resultOverlay.classList.add('hidden');
+                    gameState = 'MAP';
+                    initMap();
+                };
+            }
+            resultOverlay.classList.remove('hidden');
+        }
+
+        function showFailure() {
+            gameState = 'VICTORY';
+            resultText.textContent = FAILURE_TEXTS[Math.floor(Math.random() * FAILURE_TEXTS.length)] + '!';
+            resultText.style.color = '#ff4444';
+            resultBtn.textContent = '重试';
+            resultBtn.onclick = () => {
+                resultOverlay.classList.add('hidden');
+                startLevel(currentLevel);
+            };
+            resultOverlay.classList.remove('hidden');
         }
 
         function initMap() {
-            heroMotion = chapterIdx >= 3 ? 'scale' : 'rotate';
+            heroMotion = chapterIdx >= 3 && chapterIdx < 6 ? 'scale' : 'rotate';
             state = 'ROTATING';
             backBtn.classList.add('hidden');
             mapTargets = [];
-            const w = W * TARGET_SCALE, h = H * TARGET_SCALE;
+            const w = W * 1.4, h = H * 1.4;
 
-            const positions = [
-                { x: canvasW * 0.5, y: canvasH * 0.18 },
-                { x: canvasW * 0.75, y: canvasH * 0.34 },
-                { x: canvasW * 0.65, y: canvasH * 0.52 },
-                { x: canvasW * 0.55, y: canvasH * 0.68 },
-                { x: canvasW * 0.78, y: canvasH * 0.80 },
-                { x: canvasW * 0.60, y: canvasH * 0.88 },
-                { x: canvasW * 0.35, y: canvasH * 0.40 },
-                { x: canvasW * 0.22, y: canvasH * 0.66 },
-            ];
+            const positions = [];
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    positions.push({ x: canvasW * (0.2 + col * 0.3), y: canvasH * (0.2 + row * 0.3) });
+                }
+            }
+            [positions[3], positions[5]] = [positions[5], positions[3]];
 
             for (let i = 0; i < CHAPTERS.length; i++) {
                 const ch = CHAPTERS[i];
+                if (ch.id === '4-1') continue;
                 let status = 'locked';
                 if (i === 0 || completedChapters[CHAPTERS[i - 1]?.id]) status = 'unlocked';
                 if (completedChapters[ch.id]) status = 'completed';
@@ -2342,8 +2777,9 @@
                 mapTargets.push({ cx: pos.x, cy: pos.y, w, h, status, id: ch.id, level: ch.level, idx: i });
             }
 
-            const cx = chapterIdx > 0 ? mapTargets[chapterIdx - 1].cx : canvasW / 2;
-            const cy = chapterIdx > 0 ? mapTargets[chapterIdx - 1].cy : canvasH / 2;
+            const lastComplete = mapTargets.filter(t => t.status === 'completed').pop();
+            const cx = lastComplete ? lastComplete.cx : canvasW / 2;
+            const cy = lastComplete ? lastComplete.cy : canvasH / 2;
             corners = [
                 { x: cx - W / 2, y: cy - H / 2 },
                 { x: cx + W / 2, y: cy - H / 2 },
@@ -2355,6 +2791,22 @@
             anchorPos = { ...corners[anchorIdx] };
             recomputeBaseOffsets();
             if (heroMotion === 'scale') recomputeScaleOffsets();
+
+            if (chapterIdx >= 6) {
+                const c2x = cx, c2y = cy;
+                corners2 = [
+                    { x: c2x - W / 2, y: c2y - H / 2 },
+                    { x: c2x + W / 2, y: c2y - H / 2 },
+                    { x: c2x + W / 2, y: c2y + H / 2 },
+                    { x: c2x - W / 2, y: c2y + H / 2 },
+                ];
+                hero2Motion = 'scale';
+                scaleAnchorIdx2 = 2;
+                scaleValue2 = 0.5; scalePhase2 = 0; scaleDir2 = 1;
+                recomputeScaleOffsets2();
+            } else {
+                corners2 = [];
+            }
         }
 
         function drawMapTargets() {
@@ -2384,9 +2836,9 @@
                 ctx.stroke();
                 ctx.setLineDash([]);
 
-                const showAnchor = [0,1,2,6,7].includes(i);
-                const showFake = [3,4,5,6].includes(i);
-                const both = i === 6;
+                const showAnchor = [0,1,2,6,7,8].includes(i);
+                const showFake = [3,4,5,6,7,8].includes(i);
+                const both = i >= 6 && i <= 8;
                 const pad = Math.min(t.w, t.h) * 0.18;
                 const sh = t.h - pad * 2;
 
@@ -2471,6 +2923,8 @@
             else if (level === 4) initLevel4();
             else if (level === 10) initLevel10();
             else if (level === 11) initLevel11();
+            else if (level === 12) initLevel12();
+            else if (level === 13) initLevel13();
             else if (level === 6) initLevel6();
             else if (level === 7) initLevel7();
             else if (level === 8) initLevel8();
@@ -2481,7 +2935,7 @@
             gameState = 'MAP';
             initMap();
             backBtn.classList.add('hidden');
-            victoryOverlay.classList.add('hidden');
+            resultOverlay.classList.add('hidden');
         }
 
         backBtn.addEventListener('click', backToMenu);
@@ -2494,6 +2948,25 @@
         canvasH = canvas.height;
         window.addEventListener('resize', resize);
         loop();
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+
+        const landscapeHint = document.getElementById('landscapeHint');
+        function checkOrientation() {
+            const isPortrait = window.innerWidth < window.innerHeight;
+            const isTouch = 'ontouchstart' in window;
+            if (isTouch && isPortrait && window.innerWidth < 1024) {
+                landscapeHint.classList.add('show');
+            } else {
+                landscapeHint.classList.remove('show');
+            }
+        }
+        checkOrientation();
+        window.addEventListener('resize', checkOrientation);
+        window.addEventListener('orientationchange', checkOrientation);
     </script>
+    <div class="landscape-hint" id="landscapeHint">
+        <div class="landscape-icon"></div>
+        <div>请旋转设备至横屏以获得最佳体验</div>
+    </div>
 </body>
 </html>

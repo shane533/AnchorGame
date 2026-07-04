@@ -1,0 +1,17 @@
+{
+    "name": "锚的大冒险",
+    "short_name": "AnchorGame",
+    "description": "一个以锚点控制为主要玩法的网页游戏",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "orientation": "landscape",
+    "background_color": "#1a1a2e",
+    "theme_color": "#1a1a2e",
+    "icons": [
+        {
+            "src": "anchor.webp",
+            "sizes": "256x256",
+            "type": "image/webp"
+        }
+    ]
+}
