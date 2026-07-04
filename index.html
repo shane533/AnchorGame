@@ -489,6 +489,8 @@
         let completedChapters = {};
         let mapTargets = [];
         let mapEntryCooldown = 0;
+        let irisActive = false, irisRadius = 0, irisDone = false;
+        let irisTargetEntry = null;
         let mapPhase = 0;
         let tutPhase = 0;
         let target = { x: 0, y: 0, w: W * TARGET_SCALE, h: H * TARGET_SCALE };
@@ -1902,7 +1904,8 @@
         }, { passive: false });
         canvas.addEventListener('touchend', e => {
             e.preventDefault();
-            const me = new MouseEvent('mouseup', {});
+            const t = e.changedTouches[0];
+            const me = new MouseEvent('mouseup', { clientX: t.clientX, clientY: t.clientY });
             canvas.dispatchEvent(me);
         }, { passive: false });
 
@@ -1963,6 +1966,7 @@
                 drawFloatingTexts();
                 if (state === 'PAUSED') drawVertices();
                 else if (state2 === 'PAUSED') drawVertices2();
+                if (irisActive || irisDone) drawIris();
                 return;
             }
             
@@ -1980,6 +1984,23 @@
             if (state === 'PAUSED' && currentLevel !== 9) drawVertices();
             else if (state2 === 'PAUSED') drawVertices2();
             else if (pausedTrap >= 0) drawTrapVertices(traps[pausedTrap]);
+
+            if (irisActive || irisDone) drawIris();
+        }
+
+        function drawIris() {
+            ctx.save();
+            if (irisRadius <= 0) {
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(0, 0, canvasW, canvasH);
+            } else {
+                ctx.beginPath();
+                ctx.rect(0, 0, canvasW, canvasH);
+                ctx.arc(canvasW / 2, canvasH / 2, irisRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fill('evenodd');
+            }
+            ctx.restore();
         }
 
         function drawRect() {
@@ -2466,6 +2487,16 @@
         /* ── Loop ── */
 
         function update() {
+            if (irisActive) {
+                irisRadius = Math.max(0, irisRadius - Math.max(canvasW, canvasH) * 0.017);
+                if (irisRadius <= 0) { irisRadius = 0; irisDone = true; irisActive = false; }
+                return;
+            }
+            if (irisDone) {
+                irisDone = false;
+                startLevel(irisTargetEntry.level);
+                return;
+            }
             if (currentLevel === 9) { updateLevel9Motion(); }
             else {
                 if (currentLevel === 8 || currentLevel === 12 || currentLevel === 13) {
@@ -2493,7 +2524,7 @@
             }
 
             if (state === 'ROTATING' && cooldownTimer <= 0) {
-                if (gameState === 'MAP') {
+                if (gameState === 'MAP' && !irisActive && !irisDone) {
                     let inTarget = false;
                     for (const t of mapTargets) {
                         if (t.status !== 'unlocked') continue;
@@ -2508,17 +2539,14 @@
                             }
                         }
                         if (ok1 && ok2) {
-                            inTarget = true;
-                            if (mapEntryCooldown > 0) mapEntryCooldown--;
-                            else {
-                                chapterIdx = t.idx;
-                                currentLevel = t.level;
-                                startLevel(t.level);
-                                return;
-                            }
+                            chapterIdx = t.idx;
+                            currentLevel = t.level;
+                            irisActive = true;
+                            irisRadius = Math.max(canvasW, canvasH);
+                            irisTargetEntry = t;
+                            return;
                         }
                     }
-                    if (!inTarget) mapEntryCooldown = 10;
                 } else if (currentLevel === 3) {
                     if (checkSuccess()) { score++; showVictory(); }
                     else if (checkLevel3Failure()) {
