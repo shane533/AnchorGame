@@ -1753,14 +1753,21 @@
             recomputeScaleOffsets2();
             state = 'ROTATING'; state2 = 'ROTATING';
             traps = [];
-            survivalTime = 0; survivalSpawnTimer = 0; survivalSpawnInterval = 90;
+            survivalTime = 0; survivalSpawnTimer = 0; survivalSpawnInterval = 150;
             document.getElementById('info').textContent = '不要碰到，坚持越久越好';
         }
 
         function updateLevel14() {
+            if (state === 'ROTATING') angle += ROTATION_SPEED * speedMultiplier;
+            updateCorners();
+            if (state2 === 'ROTATING') {
+                scalePhase2 += scaleDir2 * SCALE_SPEED * speedMultiplier;
+                scaleValue2 = 0.5 + 0.25 * Math.sin(scalePhase2);
+            }
+            updateLevel8Hero2();
             survivalTime++;
             survivalSpawnTimer++;
-            const minInterval = Math.max(20, 90 - Math.floor(survivalTime / 60));
+            const minInterval = Math.max(30, 150 - Math.floor(survivalTime / 30));
             if (survivalSpawnTimer >= minInterval) {
                 survivalSpawnTimer = 0;
                 const side = Math.random() > 0.5 ? 1 : -1;
@@ -1776,7 +1783,7 @@
                     x: x + (c.x - x) * cos90 - (c.y - y) * s,
                     y: y + (c.x - x) * s + (c.y - y) * cos90,
                 }));
-                traps.push({ corners: rc, w: L2_TW, h: L2_TH, motion: 'static', dir: side, speed: 2 + Math.random() });
+                traps.push({ corners: rc, w: L2_TW, h: L2_TH, motion: 'static', dir: side, speed: 1.2 + Math.random() * 0.6 });
             }
             const toRemove = [];
             for (let i = 0; i < traps.length; i++) {
@@ -2997,6 +3004,8 @@
 
         function initMap() {
             applyScale(computeScale());
+            document.getElementById('info').textContent =
+                'H=' + window.innerHeight + ' scale=' + scaleFactor.toFixed(3) + ' W=' + W + ' target=' + Math.round(W * 1.6);
             heroMotion = chapterIdx >= 3 && chapterIdx < 6 ? 'scale' : 'rotate';
             state = 'ROTATING';
             mapEntryCooldown = 10;
