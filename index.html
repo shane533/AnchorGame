@@ -1,0 +1,2063 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anchor Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #1a1a2e;
+            overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        canvas { display: block; }
+        #info {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.5);
+            font-size: 14px;
+            pointer-events: none;
+            letter-spacing: 0.5px;
+        }
+        .settings-wrap {
+            position: fixed;
+            top: 12px;
+            right: 16px;
+            z-index: 10;
+            user-select: none;
+        }
+        .settings-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.12);
+            color: rgba(255,255,255,0.75);
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            margin-left: auto;
+        }
+        .settings-btn:hover { background: rgba(255,255,255,0.22); }
+        .speed-menu {
+            display: none;
+            margin-top: 6px;
+            background: rgba(20,20,40,0.92);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 10px;
+            padding: 6px 0;
+            min-width: 160px;
+            backdrop-filter: blur(8px);
+        }
+        .speed-menu.open { display: block; }
+        .speed-item {
+            display: block;
+            width: 100%;
+            padding: 7px 18px;
+            border: none;
+            background: transparent;
+            color: rgba(255,255,255,0.65);
+            font-size: 13px;
+            cursor: pointer;
+            text-align: left;
+            font-family: inherit;
+            transition: background 0.15s, color 0.15s;
+        }
+        .speed-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+        .speed-item.active { color: #f0a500; font-weight: 600; }
+        .scale-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 18px 6px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            margin-top: 2px;
+        }
+        .scale-label {
+            color: rgba(255,255,255,0.45);
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .scale-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255,255,255,0.15);
+            outline: none;
+        }
+        .scale-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #f0a500;
+            cursor: pointer;
+        }
+        .scale-val {
+            color: rgba(255,255,255,0.65);
+            font-size: 12px;
+            min-width: 32px;
+            text-align: right;
+        }
+        .title-overlay {
+            display: flex;
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 24px;
+            background: #1a1a2e;
+            cursor: pointer;
+        }
+        .title-overlay.hidden { display: none; }
+        .title-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .title-icon {
+            width: 128px;
+            height: 128px;
+            object-fit: contain;
+        }
+        .title-text {
+            font-size: 64px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.85);
+            letter-spacing: 4px;
+        }
+        .title-sub {
+            font-size: 16px;
+            color: rgba(255,255,255,0.4);
+            letter-spacing: 2px;
+        }
+        .menu-overlay {
+            display: flex;
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            align-items: center;
+            justify-content: center;
+            background: #1a1a2e;
+            flex-direction: column;
+            gap: 32px;
+        }
+        .menu-overlay.hidden { display: none; }
+        .menu-title {
+            font-size: 36px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.9);
+            letter-spacing: 2px;
+        }
+        .menu-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            max-width: 780px;
+        }
+        .menu-btn {
+            padding: 14px 48px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            background: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.85);
+            font-size: 17px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s, border-color 0.2s, transform 0.1s;
+            text-align: center;
+        }
+        .menu-btn:hover {
+            background: rgba(255,255,255,0.14);
+            border-color: rgba(255,255,255,0.4);
+            transform: scale(1.03);
+        }
+        .menu-btn .sub {
+            display: block;
+            font-size: 12px;
+            color: rgba(255,255,255,0.45);
+            margin-top: 4px;
+            font-weight: 400;
+        }
+        .back-btn {
+            position: fixed;
+            top: 12px;
+            left: 16px;
+            z-index: 10;
+            padding: 6px 14px;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.08);
+            color: rgba(255,255,255,0.55);
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s, color 0.2s;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.18); color: #fff; }
+        .back-btn.hidden { display: none; }
+        .victory-overlay {
+            display: flex;
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.6);
+        }
+        .victory-overlay.hidden { display: none; }
+        .victory-card {
+            background: rgba(20,20,50,0.95);
+            border: 2px solid rgba(240,165,0,0.4);
+            border-radius: 16px;
+            padding: 32px 48px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            backdrop-filter: blur(8px);
+        }
+        .victory-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #f0a500;
+        }
+        .victory-btn {
+            padding: 12px 32px;
+            border: 2px solid #f0a500;
+            border-radius: 10px;
+            background: rgba(240,165,0,0.15);
+            color: #f0a500;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .victory-btn:hover { background: rgba(240,165,0,0.3); transform: scale(1.04); }
+    </style>
+</head>
+<body>
+    <div class="title-overlay" id="titleOverlay">
+        <div class="title-row">
+            <img class="title-icon" id="titleImg1" src="anchor.webp">
+            <span class="title-text">的大</span>
+            <img class="title-icon" id="titleImg2" src="fake_anchor.webp">
+            <span class="title-text">险</span>
+        </div>
+        <div class="title-sub">点击任意位置开始</div>
+    </div>
+    <div class="menu-overlay hidden" id="menuOverlay">
+        <div class="menu-title">Anchor Game</div>
+        <div class="menu-buttons">
+            <button class="menu-btn" data-level="1">
+                关卡 1<span class="sub">目标框 · 完全进入得分</span>
+            </button>
+            <button class="menu-btn" data-level="2">
+                关卡 2<span class="sub">多点接触 · 触碰到即得分</span>
+            </button>
+            <button class="menu-btn" data-level="3">
+                关卡 3<span class="sub">穿越陷阱 · 到达目标框得分</span>
+            </button>
+            <button class="menu-btn" data-level="4">
+                关卡 4<span class="sub">操控陷阱 · 旋转开路</span>
+            </button>
+            <button class="menu-btn" data-level="5">
+                关卡 5<span class="sub">缩放锚点 · 伸缩穿越</span>
+            </button>
+            <button class="menu-btn" data-level="6">
+                关卡 6<span class="sub">静态陷阱 · 精密穿越</span>
+            </button>
+            <button class="menu-btn" data-level="7">
+                关卡 7<span class="sub">缩放陷阱 · 同步伸缩</span>
+            </button>
+            <button class="menu-btn" data-level="8">
+                关卡 8<span class="sub">双人协同 · 同时达标</span>
+            </button>
+            <button class="menu-btn" data-level="9">
+                关卡 9<span class="sub">对齐锚点 · 切换方位</span>
+            </button>
+        </div>
+    </div>
+    <div class="victory-overlay hidden" id="victoryOverlay">
+        <div class="victory-card">
+            <div class="victory-title">关卡通过!</div>
+            <button class="victory-btn" id="victoryBtn">下一关</button>
+        </div>
+    </div>
+    <button class="back-btn hidden" id="backBtn">← 返回选关</button>
+    <canvas id="gameCanvas"></canvas>
+    <div class="settings-wrap">
+        <button class="settings-btn" id="settingsBtn" title="设置">⚙</button>
+        <div class="speed-menu" id="speedMenu">
+            <button class="speed-item" data-speed="0.5">0.5x</button>
+            <button class="speed-item" data-speed="0.75">0.75x</button>
+            <button class="speed-item active" data-speed="1">1x</button>
+            <button class="speed-item" data-speed="1.5">1.5x</button>
+            <button class="speed-item" data-speed="2">2x</button>
+            <div class="scale-row">
+                <span class="scale-label">缩放</span>
+                <input type="range" class="scale-slider" id="scaleSlider" min="25" max="100" value="50" step="1">
+                <span class="scale-val" id="scaleVal">50%</span>
+            </div>
+        </div>
+    </div>
+    <div id="info">点击矩形暂停 · 拖动到顶点切换锚点</div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let canvasW, canvasH;
+
+        function resize() {
+            canvasW = canvas.width = window.innerWidth;
+            canvasH = canvas.height = window.innerHeight;
+            if (gameState !== 'PLAYING') return;
+            if (currentLevel === 3) { resetLevel3(); return; }
+            if (currentLevel === 4) { resetLevel4(); return; }
+            if (currentLevel === 5) { initLevel5(); return; }
+            if (currentLevel === 6) { resetLevel6(); return; }
+            if (currentLevel === 7) { resetLevel7(); return; }
+            if (currentLevel === 8) { resetLevel8(); return; }
+            if (currentLevel === 9) { resetLevel9(); return; }
+            initCorners();
+            if (currentLevel === 1) generateTarget();
+            else generateLevel2Targets();
+        }
+
+        const BASE_W = 256;
+        const BASE_H = 256;
+        const ROTATION_SPEED = 0.012;
+        const BASE_VERTEX_RADIUS = 14;
+        const TARGET_SCALE = 2;
+        const COOLDOWN_FRAMES = 60;
+        const BASE_L2_TW = 180, BASE_L2_TH = 180, L2_COUNT = 3;
+
+        let W = BASE_W;
+        let H = BASE_H;
+        let VERTEX_HIT_RADIUS = BASE_VERTEX_RADIUS;
+        let L2_TW = BASE_L2_TW;
+        let L2_TH = BASE_L2_TH;
+        let OVERLAP_THRESHOLD = Math.min(L2_TW, L2_TH) * 0.18;
+        let scaleFactor = 1;
+
+        function applyScale(factor) {
+            scaleFactor = factor;
+            W = Math.round(BASE_W * factor);
+            H = Math.round(BASE_H * factor);
+            L2_TW = Math.round(BASE_L2_TW * factor);
+            L2_TH = Math.round(BASE_L2_TH * factor);
+            VERTEX_HIT_RADIUS = Math.round(BASE_VERTEX_RADIUS * factor);
+            OVERLAP_THRESHOLD = Math.max(5, Math.round(Math.min(L2_TW, L2_TH) * 0.18));
+            target.w = W * TARGET_SCALE;
+            target.h = H * TARGET_SCALE;
+            if (gameState === 'PLAYING') {
+                if (currentLevel === 1) {
+                    initCorners();
+                    targets = [];
+                    generateTarget();
+                } else if (currentLevel === 2) {
+                    initCorners();
+                    target = { x: 0, y: 0, w: W * TARGET_SCALE, h: H * TARGET_SCALE };
+                    generateLevel2Targets();
+                } else if (currentLevel === 3) {
+                    resetLevel3();
+                } else if (currentLevel === 4) {
+                    resetLevel4();
+                } else if (currentLevel === 5) {
+                    initLevel5();
+                } else if (currentLevel === 6) {
+                    resetLevel6();
+                } else if (currentLevel === 7) {
+                    resetLevel7();
+                } else if (currentLevel === 8) {
+                    resetLevel8();
+                } else if (currentLevel === 9) {
+                    resetLevel9();
+                }
+            }
+        }
+
+        let state = 'ROTATING';
+        let angle = 0;
+        let anchorIdx = 0;
+        let heroMotion = 'rotate';
+        let score = 0;
+        let speedMultiplier = 1;
+        let gameState = 'TITLE';
+        let currentLevel = 1;
+        let target = { x: 0, y: 0, w: W * TARGET_SCALE, h: H * TARGET_SCALE };
+        let targets = [];
+        let traps = [];
+        let floatingTexts = [];
+        let cooldownTimer = 0;
+
+        let scaleValue = 0.5, scalePhase = 0, scaleAnchorIdx = 2, scaleDir = 1;
+        let scaleBaseOffsets = [];
+        const SCALE_SPEED = 0.02;
+        const TOTAL_LEVELS = 9;
+
+        let corners2 = [], baseOffsets2 = [], anchorPos2 = {};
+        let anchorIdx2 = 0, angle2 = 0, state2 = 'ROTATING';
+        let hero2Motion = 'scale';
+        let scaleValue2 = 0.5, scalePhase2 = 0, scaleAnchorIdx2 = 2, scaleDir2 = 1;
+        let scaleBaseOffsets2 = [];
+
+        applyScale(0.5);
+
+        const anchorImg = new Image();
+        anchorImg.src = 'anchor.webp';
+        let imgLoaded = false;
+        let innerRect = null;
+        anchorImg.onload = () => {
+            imgLoaded = true;
+            analyzeTransparency();
+        };
+
+        function analyzeTransparency() {
+            const w = anchorImg.width;
+            const h = anchorImg.height;
+            const tc = document.createElement('canvas');
+            tc.width = w; tc.height = h;
+            const tctx = tc.getContext('2d');
+            tctx.drawImage(anchorImg, 0, 0);
+            const d = tctx.getImageData(0, 0, w, h).data;
+            let minX = w, minY = h, maxX = 0, maxY = 0;
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    if (d[(y * w + x) * 4 + 3] > 10) {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+            }
+            if (maxX > minX && maxY > minY) {
+                innerRect = {
+                    left: minX / w,
+                    right: maxX / w,
+                    top: minY / h,
+                    bottom: maxY / h,
+                };
+            }
+        }
+
+        const trapImg = new Image();
+        trapImg.src = 'shuriken.webp';
+        let trapImgLoaded = false;
+        trapImg.onload = () => { trapImgLoaded = true; };
+
+        const fakeAnchorImg = new Image();
+        fakeAnchorImg.src = 'fake_anchor.webp';
+        let fakeAnchorLoaded = false;
+        fakeAnchorImg.onload = () => { fakeAnchorLoaded = true; };
+
+        let corners = [];
+        let baseOffsets = [];
+        let anchorPos = { x: 0, y: 0 };
+
+        function initCorners() {
+            heroMotion = 'rotate';
+            const cx = canvasW / 2;
+            const cy = canvasH / 2;
+            corners = [
+                { x: cx - W / 2, y: cy - H / 2 },
+                { x: cx + W / 2, y: cy - H / 2 },
+                { x: cx + W / 2, y: cy + H / 2 },
+                { x: cx - W / 2, y: cy + H / 2 },
+            ];
+            anchorIdx = 0;
+            angle = 0;
+            anchorPos = { ...corners[anchorIdx] };
+            recomputeBaseOffsets();
+        }
+
+        function recomputeBaseOffsets() {
+            baseOffsets = corners.map(c => ({
+                x: c.x - anchorPos.x,
+                y: c.y - anchorPos.y,
+            }));
+        }
+
+        function rotatePoint(p, a) {
+            const cos = Math.cos(a), sin = Math.sin(a);
+            return {
+                x: p.x * cos - p.y * sin,
+                y: p.x * sin + p.y * cos,
+            };
+        }
+
+        function updateCorners() {
+            for (let i = 0; i < 4; i++) {
+                const r = rotatePoint(baseOffsets[i], angle);
+                corners[i] = { x: anchorPos.x + r.x, y: anchorPos.y + r.y };
+            }
+        }
+
+        function setNewAnchor(idx) {
+            anchorIdx = idx;
+            anchorPos = { ...corners[idx] };
+            angle = 0;
+            recomputeBaseOffsets();
+        }
+
+        function rectAABB() {
+            return {
+                minX: Math.min(...corners.map(c => c.x)),
+                minY: Math.min(...corners.map(c => c.y)),
+                maxX: Math.max(...corners.map(c => c.x)),
+                maxY: Math.max(...corners.map(c => c.y)),
+            };
+        }
+
+        function generateTarget() {
+            const tw = target.w, th = target.h;
+            for (let i = 0; i < 200; i++) {
+                const tx = 10 + Math.random() * (canvasW - tw - 20);
+                const ty = 40 + Math.random() * (canvasH - th - 50);
+                const aabb = rectAABB();
+                if (aabb.maxX < tx || aabb.minX > tx + tw || aabb.maxY < ty || aabb.minY > ty + th) {
+                    target.x = tx;
+                    target.y = ty;
+                    return;
+                }
+            }
+            target.x = 10;
+            target.y = 50;
+        }
+
+        function checkSuccess() {
+            const { x, y, w, h } = target;
+            for (const c of corners) {
+                if (c.x < x || c.x > x + w || c.y < y || c.y > y + h) return false;
+            }
+            return true;
+        }
+
+        function satCollision(rotated, aabb) {
+            return satOverlap(rotated, aabb) > 0;
+        }
+
+        function satOverlap(rotated, aabb) {
+            const axes = [
+                { x: rotated[1].x - rotated[0].x, y: rotated[1].y - rotated[0].y },
+                { x: rotated[3].x - rotated[0].x, y: rotated[3].y - rotated[0].y },
+                { x: 1, y: 0 },
+                { x: 0, y: 1 },
+            ].map(a => {
+                const len = Math.sqrt(a.x * a.x + a.y * a.y);
+                return { x: a.x / len, y: a.y / len };
+            });
+
+            const aabbCorners = [
+                { x: aabb.x, y: aabb.y },
+                { x: aabb.x + aabb.w, y: aabb.y },
+                { x: aabb.x + aabb.w, y: aabb.y + aabb.h },
+                { x: aabb.x, y: aabb.y + aabb.h },
+            ];
+
+            let minOverlap = Infinity;
+            for (const axis of axes) {
+                let minR = Infinity, maxR = -Infinity;
+                for (const c of rotated) {
+                    const p = c.x * axis.x + c.y * axis.y;
+                    if (p < minR) minR = p;
+                    if (p > maxR) maxR = p;
+                }
+                let minA = Infinity, maxA = -Infinity;
+                for (const c of aabbCorners) {
+                    const p = c.x * axis.x + c.y * axis.y;
+                    if (p < minA) minA = p;
+                    if (p > maxA) maxA = p;
+                }
+                if (maxR < minA || maxA < minR) return 0;
+                const overlap = Math.min(maxR, maxA) - Math.max(minR, minA);
+                if (overlap < minOverlap) minOverlap = overlap;
+            }
+            return minOverlap;
+        }
+
+        function generateLevel2Targets() {
+            targets = [];
+            for (let j = 0; j < L2_COUNT; j++) {
+                targets.push(tryPlaceTarget());
+            }
+        }
+
+        function tryPlaceTarget() {
+            const inner = getInnerCorners();
+            for (let i = 0; i < 200; i++) {
+                const tx = 10 + Math.random() * (canvasW - L2_TW - 20);
+                const ty = 40 + Math.random() * (canvasH - L2_TH - 50);
+                const box = { x: tx, y: ty, w: L2_TW, h: L2_TH };
+                if (satCollision(inner, box)) continue;
+                const overlaps = targets.some(t => aabbOverlap(t, box));
+                if (overlaps) continue;
+                return box;
+            }
+            return { x: 10 + targets.length * 170, y: 50, w: L2_TW, h: L2_TH };
+        }
+
+        function aabbOverlap(a, b) {
+            return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+        }
+
+        function getInnerCorners() {
+            if (!innerRect) return corners;
+            const p = corners;
+            const r = innerRect;
+            const ex = { x: p[1].x - p[0].x, y: p[1].y - p[0].y };
+            const ey = { x: p[3].x - p[0].x, y: p[3].y - p[0].y };
+            return [
+                { x: p[0].x + ex.x * r.left   + ey.x * r.top,    y: p[0].y + ex.y * r.left   + ey.y * r.top },
+                { x: p[0].x + ex.x * r.right  + ey.x * r.top,    y: p[0].y + ex.y * r.right  + ey.y * r.top },
+                { x: p[0].x + ex.x * r.right  + ey.x * r.bottom, y: p[0].y + ex.y * r.right  + ey.y * r.bottom },
+                { x: p[0].x + ex.x * r.left   + ey.x * r.bottom, y: p[0].y + ex.y * r.left   + ey.y * r.bottom },
+            ];
+        }
+
+        function checkLevel2Success() {
+            const inner = getInnerCorners();
+            for (let i = 0; i < targets.length; i++) {
+                const overlap = satOverlap(inner, targets[i]);
+                if (overlap >= OVERLAP_THRESHOLD) return i;
+            }
+            return -1;
+        }
+
+        function initLevel3() {
+            heroMotion = 'rotate';
+            const third = canvasW / 3;
+            const cx = third / 2;
+            const cy = canvasH / 2;
+            corners = [
+                { x: cx - W / 2, y: cy - H / 2 },
+                { x: cx + W / 2, y: cy - H / 2 },
+                { x: cx + W / 2, y: cy + H / 2 },
+                { x: cx - W / 2, y: cy + H / 2 },
+            ];
+            anchorIdx = 0;
+            angle = 0;
+            anchorPos = { ...corners[anchorIdx] };
+            recomputeBaseOffsets();
+
+            const tw = W * TARGET_SCALE;
+            const th = H * TARGET_SCALE;
+            target.x = canvasW - third / 2 - tw / 2;
+            target.y = cy - th / 2;
+            target.w = tw;
+            target.h = th;
+
+            generateLevel3Traps();
+        }
+
+        function generateLevel3Traps() {
+            traps = [];
+            const third = canvasW / 3;
+            const midW = canvasW - third * 2;
+
+            const positions = [
+                { x: third + midW * 0.12, y: canvasH * 0.35 },
+                { x: third + midW * 0.42, y: canvasH * 0.78 },
+                { x: third + midW * 0.58, y: canvasH * 0.22 },
+                { x: third + midW * 0.88, y: canvasH * 0.65 },
+            ];
+
+            for (const p of positions) {
+                const cx = p.x, cy = p.y;
+                const hw = L2_TW / 2, hh = L2_TH / 2;
+                traps.push({
+                    w: L2_TW, h: L2_TH, cx, cy,
+                    motion: 'rotate',
+                    angle: Math.random() * Math.PI * 2,
+                    speed: 3 * ROTATION_SPEED,
+                    corners: [
+                        { x: cx - hw, y: cy - hh },
+                        { x: cx + hw, y: cy - hh },
+                        { x: cx + hw, y: cy + hh },
+                        { x: cx - hw, y: cy + hh },
+                    ],
+                });
+            }
+        }
+
+        function generateLevel4Traps() {
+            traps = [];
+            const third = canvasW / 3;
+            const midW = canvasW - third * 2;
+            const positions = [
+                { x: third + midW * 0.15, y: canvasH * 0.40 },
+                { x: third + midW * 0.42, y: canvasH * 0.68 },
+                { x: third + midW * 0.58, y: canvasH * 0.32 },
+                { x: third + midW * 0.85, y: canvasH * 0.60 },
+            ];
+            for (const p of positions) {
+                const cx = p.x, cy = p.y;
+                const hw = L2_TW / 2, hh = L2_TH / 2;
+                traps.push({
+                    w: L2_TW, h: L2_TH, cx, cy,
+                    motion: 'rotate',
+                    angle: Math.random() * Math.PI * 2,
+                    speed: 3 * ROTATION_SPEED,
+                    corners: [
+                        { x: cx - hw, y: cy - hh },
+                        { x: cx + hw, y: cy - hh },
+                        { x: cx + hw, y: cy + hh },
+                        { x: cx - hw, y: cy + hh },
+                    ],
+                });
+            }
+        }
+
+        function updateLevel3Traps() {
+            for (const t of traps) {
+                t.angle += t.speed * speedMultiplier;
+                const hw = t.w / 2, hh = t.h / 2;
+                const cos = Math.cos(t.angle), sin = Math.sin(t.angle);
+                t.corners = [
+                    { x: t.cx - hw * cos + hh * sin, y: t.cy - hw * sin - hh * cos },
+                    { x: t.cx + hw * cos + hh * sin, y: t.cy + hw * sin - hh * cos },
+                    { x: t.cx + hw * cos - hh * sin, y: t.cy + hw * sin + hh * cos },
+                    { x: t.cx - hw * cos - hh * sin, y: t.cy - hw * sin + hh * cos },
+                ];
+            }
+        }
+
+        function checkLevel3Failure() {
+            const inner = getInnerCorners();
+            for (const trap of traps) {
+                if (satOverlapPoly(inner, trap.corners) >= OVERLAP_THRESHOLD) return true;
+            }
+            return false;
+        }
+
+        function resetLevel3() {
+            initLevel3();
+            cooldownTimer = 0;
+            state = 'ROTATING';
+            angle = 0;
+            anchorIdx = 0;
+        }
+
+        let pausedTrap = -1;
+
+        function initLevel4() {
+            initLevel3();
+            generateLevel4Traps();
+            for (let i = 0; i < traps.length; i++) {
+                const t = traps[i];
+                traps[i] = {
+                    w: t.w, h: t.h,
+                    motion: 'rotate',
+                    corners: [
+                        { x: t.corners[0].x, y: t.corners[0].y },
+                        { x: t.corners[1].x, y: t.corners[1].y },
+                        { x: t.corners[2].x, y: t.corners[2].y },
+                        { x: t.corners[3].x, y: t.corners[3].y },
+                    ],
+                    angle: 0,
+                    selfSpin: 0,
+                    anchorIdx: i % 4,
+                    state: 'ROTATING',
+                    speed: ROTATION_SPEED,
+                    spinSpeed: 3 * ROTATION_SPEED,
+                };
+                const tr = traps[i];
+                tr.anchorPos = { ...tr.corners[tr.anchorIdx] };
+                tr.baseOffsets = tr.corners.map(c => ({ x: c.x - tr.anchorPos.x, y: c.y - tr.anchorPos.y }));
+            }
+            pausedTrap = -1;
+        }
+
+        function updateTrapCorners(trap) {
+            const cos = Math.cos(trap.angle), sin = Math.sin(trap.angle);
+            for (let i = 0; i < 4; i++) {
+                const b = trap.baseOffsets[i];
+                const rx = b.x * cos - b.y * sin;
+                const ry = b.x * sin + b.y * cos;
+                trap.corners[i] = { x: trap.anchorPos.x + rx, y: trap.anchorPos.y + ry };
+            }
+            const cx = (trap.corners[0].x + trap.corners[2].x) / 2;
+            const cy = (trap.corners[0].y + trap.corners[2].y) / 2;
+            const sc = Math.cos(trap.selfSpin), ss = Math.sin(trap.selfSpin);
+            for (let i = 0; i < 4; i++) {
+                const dx = trap.corners[i].x - cx;
+                const dy = trap.corners[i].y - cy;
+                trap.corners[i] = { x: cx + dx * sc - dy * ss, y: cy + dx * ss + dy * sc };
+            }
+        }
+
+        function updateLevel4Traps() {
+            for (let i = 0; i < traps.length; i++) {
+                const t = traps[i];
+                if (t.state === 'ROTATING') {
+                    t.angle += t.speed * speedMultiplier;
+                    t.selfSpin += t.spinSpeed * speedMultiplier;
+                }
+                updateTrapCorners(t);
+            }
+        }
+
+        function setTrapAnchor(trap, idx) {
+            trap.anchorIdx = idx;
+            trap.anchorPos = { ...trap.corners[idx] };
+            trap.angle = 0;
+            trap.baseOffsets = trap.corners.map(c => ({ x: c.x - trap.anchorPos.x, y: c.y - trap.anchorPos.y }));
+        }
+
+        function checkLevel4Success() {
+            return checkSuccess();
+        }
+
+        function satOverlapPoly(polyA, polyB) {
+            const axes = [];
+            for (const poly of [polyA, polyB]) {
+                for (let i = 0; i < poly.length; i++) {
+                    const j = (i + 1) % poly.length;
+                    const dx = poly[j].x - poly[i].x;
+                    const dy = poly[j].y - poly[i].y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    axes.push({ x: dx / len, y: dy / len });
+                }
+            }
+            let minOverlap = Infinity;
+            for (const axis of axes) {
+                let minA = Infinity, maxA = -Infinity;
+                for (const c of polyA) {
+                    const p = c.x * axis.x + c.y * axis.y;
+                    if (p < minA) minA = p; if (p > maxA) maxA = p;
+                }
+                let minB = Infinity, maxB = -Infinity;
+                for (const c of polyB) {
+                    const p = c.x * axis.x + c.y * axis.y;
+                    if (p < minB) minB = p; if (p > maxB) maxB = p;
+                }
+                if (maxA < minB || maxB < minA) return 0;
+                const overlap = Math.min(maxA, maxB) - Math.max(minA, minB);
+                if (overlap < minOverlap) minOverlap = overlap;
+            }
+            return minOverlap;
+        }
+
+        function checkLevel4Failure() {
+            const inner = getInnerCorners();
+            for (const t of traps) {
+                if (satOverlapPoly(inner, t.corners) >= OVERLAP_THRESHOLD) return true;
+            }
+            return false;
+        }
+
+        function resetLevel4() {
+            initLevel4();
+            cooldownTimer = 0;
+            state = 'ROTATING';
+            angle = 0;
+            anchorIdx = 0;
+        }
+
+        function initLevel5() {
+            heroMotion = 'scale';
+            const third = canvasW / 3;
+            const cx = third / 2;
+            const cy = canvasH / 2;
+            corners = [
+                { x: cx - W / 2, y: cy - H / 2 },
+                { x: cx + W / 2, y: cy - H / 2 },
+                { x: cx + W / 2, y: cy + H / 2 },
+                { x: cx - W / 2, y: cy + H / 2 },
+            ];
+            scaleAnchorIdx = 2;
+            scaleValue = 0.5;
+            scalePhase = 0;
+            scaleDir = 1;
+            recomputeScaleOffsets();
+
+            const tw = W * TARGET_SCALE;
+            const th = H * TARGET_SCALE;
+            target.x = canvasW - third / 2 - tw / 2;
+            target.y = cy - th / 2;
+            target.w = tw;
+            target.h = th;
+        }
+
+        function recomputeScaleOffsets() {
+            const anchor = corners[scaleAnchorIdx];
+            scaleBaseOffsets = corners.map(c => ({
+                x: (c.x - anchor.x) / Math.max(scaleValue, 0.01),
+                y: (c.y - anchor.y) / Math.max(scaleValue, 0.01),
+            }));
+        }
+
+        function updateLevel5Corners() {
+            const anchor = corners[scaleAnchorIdx];
+            for (let i = 0; i < 4; i++) {
+                corners[i] = {
+                    x: anchor.x + scaleBaseOffsets[i].x * scaleValue,
+                    y: anchor.y + scaleBaseOffsets[i].y * scaleValue,
+                };
+            }
+        }
+
+        function setScaleAnchor(idx) {
+            scaleAnchorIdx = idx;
+            scaleDir *= -1;
+            recomputeScaleOffsets();
+        }
+
+        function initLevel6() {
+            heroMotion = 'scale';
+            const third = canvasW / 3;
+            const cx = third / 2;
+            const cy = canvasH / 2;
+            corners = [
+                { x: cx - W / 2, y: cy - H / 2 },
+                { x: cx + W / 2, y: cy - H / 2 },
+                { x: cx + W / 2, y: cy + H / 2 },
+                { x: cx - W / 2, y: cy + H / 2 },
+            ];
+            scaleAnchorIdx = 2;
+            scaleValue = 0.5;
+            scalePhase = 0;
+            scaleDir = 1;
+            recomputeScaleOffsets();
+
+            const tw = W * TARGET_SCALE;
+            const th = H * TARGET_SCALE;
+            target.x = canvasW - third / 2 - tw / 2;
+            target.y = cy - th / 2;
+            target.w = tw;
+            target.h = th;
+
+            generateLevel6Traps();
+        }
+
+        function generateLevel6Traps() {
+            traps = [];
+            const third = canvasW / 3;
+            const midW = canvasW - third * 2;
+            const positions = [
+                { x: third + midW * 0.15, y: canvasH * 0.32 },
+                { x: third + midW * 0.42, y: canvasH * 0.74 },
+                { x: third + midW * 0.58, y: canvasH * 0.26 },
+                { x: third + midW * 0.85, y: canvasH * 0.68 },
+            ];
+            for (const p of positions) {
+                const hw = L2_TW / 2, hh = L2_TH / 2;
+                traps.push({
+                    w: L2_TW, h: L2_TH, cx: p.x, cy: p.y,
+                    motion: 'rotate',
+                    angle: Math.random() * Math.PI * 2,
+                    speed: 3 * ROTATION_SPEED,
+                    corners: [
+                        { x: p.x - hw, y: p.y - hh },
+                        { x: p.x + hw, y: p.y - hh },
+                        { x: p.x + hw, y: p.y + hh },
+                        { x: p.x - hw, y: p.y + hh },
+                    ],
+                });
+            }
+        }
+
+        function checkLevel6Failure() {
+            const inner = getInnerCorners();
+            for (const trap of traps) {
+                if (satOverlapPoly(inner, trap.corners) >= OVERLAP_THRESHOLD) return true;
+            }
+            return false;
+        }
+
+        function resetLevel6() {
+            initLevel6();
+            cooldownTimer = 0;
+            state = 'ROTATING';
+        }
+
+        function initLevel7() {
+            heroMotion = 'scale';
+            const third = canvasW / 3;
+            const cx = third / 2;
+            const cy = canvasH / 2;
+            corners = [
+                { x: cx - W / 2, y: cy - H / 2 },
+                { x: cx + W / 2, y: cy - H / 2 },
+                { x: cx + W / 2, y: cy + H / 2 },
+                { x: cx - W / 2, y: cy + H / 2 },
+            ];
+            scaleAnchorIdx = 2;
+            scaleValue = 0.5;
+            scalePhase = 0;
+            scaleDir = 1;
+            recomputeScaleOffsets();
+
+            const tw = W * TARGET_SCALE;
+            const th = H * TARGET_SCALE;
+            target.x = canvasW - third / 2 - tw / 2;
+            target.y = cy - th / 2;
+            target.w = tw;
+            target.h = th;
+
+            generateLevel7Traps();
+            pausedTrap = -1;
+        }
+
+        function generateLevel7Traps() {
+            traps = [];
+            const third = canvasW / 3;
+            const midW = canvasW - third * 2;
+            const positions = [
+                { x: third + midW * 0.18, y: canvasH * 0.30 },
+                { x: third + midW * 0.42, y: canvasH * 0.72 },
+                { x: third + midW * 0.58, y: canvasH * 0.28 },
+                { x: third + midW * 0.82, y: canvasH * 0.70 },
+            ];
+            for (const p of positions) {
+                const hw = L2_TW / 2, hh = L2_TH / 2;
+                const crn = [
+                    { x: p.x - hw, y: p.y - hh },
+                    { x: p.x + hw, y: p.y - hh },
+                    { x: p.x + hw, y: p.y + hh },
+                    { x: p.x - hw, y: p.y + hh },
+                ];
+                const aIdx = 2;
+                const baseAnchor = { ...crn[aIdx] };
+                traps.push({
+                    w: L2_TW, h: L2_TH,
+                    motion: 'scale',
+                    corners: crn.map(c => ({ ...c })),
+                    scaleAnchorIdx: aIdx,
+                    baseAnchor,
+                    scaleValue: 0.5,
+                    scalePhase: 0,
+                    scaleDir: (Math.random() > 0.5 ? 1 : -1),
+                    scaleBaseOffsets: crn.map(c => ({
+                        x: c.x - baseAnchor.x,
+                        y: c.y - baseAnchor.y,
+                    })),
+                    state: 'ROTATING',
+                    selfSpin: 0,
+                    spinSpeed: 3 * ROTATION_SPEED,
+                });
+            }
+        }
+
+        function updateLevel7Traps() {
+            for (const t of traps) {
+                if (t.state === 'ROTATING') {
+                    t.scalePhase += t.scaleDir * SCALE_SPEED * speedMultiplier;
+                    t.scaleValue = 0.5 + 0.25 * Math.sin(t.scalePhase);
+                    t.selfSpin += t.spinSpeed * speedMultiplier;
+                }
+                for (let i = 0; i < 4; i++) {
+                    t.corners[i] = {
+                        x: t.baseAnchor.x + t.scaleBaseOffsets[i].x * t.scaleValue,
+                        y: t.baseAnchor.y + t.scaleBaseOffsets[i].y * t.scaleValue,
+                    };
+                }
+                const cx = (t.corners[0].x + t.corners[2].x) / 2;
+                const cy = (t.corners[0].y + t.corners[2].y) / 2;
+                const sc = Math.cos(t.selfSpin), ss = Math.sin(t.selfSpin);
+                for (let i = 0; i < 4; i++) {
+                    const dx = t.corners[i].x - cx;
+                    const dy = t.corners[i].y - cy;
+                    t.corners[i] = { x: cx + dx * sc - dy * ss, y: cy + dx * ss + dy * sc };
+                }
+            }
+        }
+
+        function setTrapScaleAnchor(trap, idx) {
+            trap.scaleAnchorIdx = idx;
+            trap.scaleDir *= -1;
+
+            const cx = (trap.corners[0].x + trap.corners[2].x) / 2;
+            const cy = (trap.corners[0].y + trap.corners[2].y) / 2;
+            const sc = Math.cos(-trap.selfSpin), ss = Math.sin(-trap.selfSpin);
+            const unspun = trap.corners.map(c => ({
+                x: cx + (c.x - cx) * sc - (c.y - cy) * ss,
+                y: cy + (c.x - cx) * ss + (c.y - cy) * sc,
+            }));
+
+            trap.baseAnchor = { ...unspun[idx] };
+            trap.scaleBaseOffsets = unspun.map(c => ({
+                x: (c.x - trap.baseAnchor.x) / Math.max(trap.scaleValue, 0.01),
+                y: (c.y - trap.baseAnchor.y) / Math.max(trap.scaleValue, 0.01),
+            }));
+        }
+
+        function checkLevel7Failure() {
+            const inner = getInnerCorners();
+            for (const trap of traps) {
+                if (satOverlapPoly(inner, trap.corners) >= OVERLAP_THRESHOLD) return true;
+            }
+            return false;
+        }
+
+        function resetLevel7() {
+            initLevel7();
+            cooldownTimer = 0;
+            state = 'ROTATING';
+        }
+
+        function initLevel8() {
+            heroMotion = 'rotate';
+            hero2Motion = 'scale';
+            const third = canvasW / 3;
+            const cx1 = third / 2;
+            const cx2 = canvasW - third / 2;
+            const cy = canvasH / 2;
+            corners = [
+                { x: cx1 - W / 2, y: cy - H / 2 },
+                { x: cx1 + W / 2, y: cy - H / 2 },
+                { x: cx1 + W / 2, y: cy + H / 2 },
+                { x: cx1 - W / 2, y: cy + H / 2 },
+            ];
+            anchorIdx = 0; angle = 0;
+            anchorPos = { ...corners[anchorIdx] };
+            recomputeBaseOffsets();
+
+            corners2 = [
+                { x: cx2 - W / 2, y: cy - H / 2 },
+                { x: cx2 + W / 2, y: cy - H / 2 },
+                { x: cx2 + W / 2, y: cy + H / 2 },
+                { x: cx2 - W / 2, y: cy + H / 2 },
+            ];
+            scaleAnchorIdx2 = 2;
+            scaleValue2 = 0.5; scalePhase2 = 0; scaleDir2 = 1;
+            recomputeScaleOffsets2();
+
+            target.x = canvasW / 2 - (W * TARGET_SCALE) / 2;
+            target.y = cy - (H * TARGET_SCALE) / 2;
+            target.w = W * TARGET_SCALE;
+            target.h = H * TARGET_SCALE;
+
+            state = 'ROTATING'; state2 = 'ROTATING';
+        }
+
+        function recomputeScaleOffsets2() {
+            const anchor = corners2[scaleAnchorIdx2];
+            scaleBaseOffsets2 = corners2.map(c => ({
+                x: (c.x - anchor.x) / Math.max(scaleValue2, 0.01),
+                y: (c.y - anchor.y) / Math.max(scaleValue2, 0.01),
+            }));
+        }
+
+        function updateLevel8Hero2() {
+            if (state2 === 'ROTATING') {
+                scalePhase2 += scaleDir2 * SCALE_SPEED * speedMultiplier;
+                scaleValue2 = 0.5 + 0.25 * Math.sin(scalePhase2);
+            }
+            const anchor = corners2[scaleAnchorIdx2];
+            for (let i = 0; i < 4; i++) {
+                corners2[i] = {
+                    x: anchor.x + scaleBaseOffsets2[i].x * scaleValue2,
+                    y: anchor.y + scaleBaseOffsets2[i].y * scaleValue2,
+                };
+            }
+        }
+
+        function setScaleAnchor2(idx) {
+            scaleAnchorIdx2 = idx;
+            scaleDir2 *= -1;
+            recomputeScaleOffsets2();
+        }
+
+        function checkLevel8Success() {
+            const { x, y, w, h } = target;
+            for (const c of corners) {
+                if (c.x < x || c.x > x + w || c.y < y || c.y > y + h) return false;
+            }
+            for (const c of corners2) {
+                if (c.x < x || c.x > x + w || c.y < y || c.y > y + h) return false;
+            }
+            return true;
+        }
+
+        function resetLevel8() {
+            initLevel8();
+            cooldownTimer = 0;
+        }
+
+        let alignAnchors = [];
+        let hAlign = 'left', vAlign = 'top';
+        let heroGX = 0, heroGY = 0;
+
+        function initLevel9() {
+            heroMotion = 'align';
+            const heroSize = W;
+            const pad = heroSize * 0.3;
+            const boxW = heroSize * 3 + pad * 2;
+            const boxH = heroSize * 3 + pad * 2;
+            const bx = (canvasW - boxW) / 2;
+            const by = (canvasH - boxH) / 2;
+
+            corners = [
+                { x: bx, y: by },
+                { x: bx + boxW, y: by },
+                { x: bx + boxW, y: by + boxH },
+                { x: bx, y: by + boxH },
+            ];
+
+            const tw = W * 1.4, th = H * 1.4;
+            target.w = tw; target.h = th;
+            target.x = bx + boxW - pad - tw;
+            target.y = by + boxH - pad - th;
+
+            alignAnchors = [
+                { x: bx + boxW / 2, y: by + pad / 2, dir: 'top' },
+                { x: bx + boxW / 2, y: by + boxH - pad / 2, dir: 'bottom' },
+                { x: bx + pad / 2, y: by + boxH / 2, dir: 'left' },
+                { x: bx + boxW - pad / 2, y: by + boxH / 2, dir: 'right' },
+            ];
+
+            hAlign = 'left'; vAlign = 'top';
+            setHeroTarget();
+            heroGX = alignTargetX; heroGY = alignTargetY;
+            updateHeroPos();
+            state = 'ROTATING';
+        }
+
+        let alignTargetX = 0, alignTargetY = 0;
+
+        function setHeroTarget() {
+            const pad = W * 0.3;
+            const bx = corners[0].x, by = corners[0].y;
+            const boxW = corners[1].x - bx, boxH = corners[3].y - by;
+            alignTargetX = hAlign === 'left' ? bx + pad + W / 2 : bx + boxW - pad - W / 2;
+            alignTargetY = vAlign === 'top' ? by + pad + H / 2 : by + boxH - pad - H / 2;
+        }
+
+        function updateHeroPos() {
+            const gx = heroGX, gy = heroGY;
+            corners2 = [
+                { x: gx - W / 2, y: gy - H / 2 },
+                { x: gx + W / 2, y: gy - H / 2 },
+                { x: gx + W / 2, y: gy + H / 2 },
+                { x: gx - W / 2, y: gy + H / 2 },
+            ];
+        }
+
+        function updateLevel9Motion() {
+            const lerp = 0.12;
+            heroGX += (alignTargetX - heroGX) * lerp;
+            heroGY += (alignTargetY - heroGY) * lerp;
+            updateHeroPos();
+        }
+
+        function checkLevel9Success() {
+            const { x, y, w, h } = target;
+            for (const c of corners2) {
+                if (c.x < x || c.x > x + w || c.y < y || c.y > y + h) return false;
+            }
+            return true;
+        }
+
+        function resetLevel9() {
+            initLevel9();
+            cooldownTimer = 0;
+        }
+
+        let mousePos = { x: -100, y: -100 };
+        let mouseDown = false;
+
+        canvas.addEventListener('mousedown', e => {
+            const rect = canvas.getBoundingClientRect();
+            const pos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            mousePos = pos;
+
+            if ((currentLevel === 4 || currentLevel === 7) && pausedTrap < 0 && state === 'ROTATING') {
+                for (let i = 0; i < traps.length; i++) {
+                    if (traps[i].state === 'ROTATING' && pointInPolygon(pos, traps[i].corners)) {
+                        mouseDown = true;
+                        traps[i].state = 'PAUSED';
+                        pausedTrap = i;
+                        return;
+                    }
+                }
+            }
+
+            if (currentLevel === 8) {
+                if (pointInPolygon(pos, corners2)) {
+                    mouseDown = true;
+                    state2 = 'PAUSED';
+                    state = 'ROTATING';
+                    return;
+                }
+                if (pointInPolygon(pos, corners)) {
+                    mouseDown = true;
+                    state = 'PAUSED';
+                    state2 = 'ROTATING';
+                    return;
+                }
+            }
+
+            if (currentLevel === 9 && pointInPolygon(pos, corners)) {
+                mouseDown = true;
+                state = 'PAUSED';
+                return;
+            }
+
+            if (pointInPolygon(pos, corners)) {
+                mouseDown = true;
+                state = 'PAUSED';
+                if (pausedTrap >= 0) {
+                    traps[pausedTrap].state = 'ROTATING';
+                    pausedTrap = -1;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+            if (currentLevel === 9 && state === 'PAUSED') {
+                let near = false;
+                for (const a of alignAnchors) {
+                    const dx = mousePos.x - a.x, dy = mousePos.y - a.y;
+                    if (dx * dx + dy * dy < VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS) { near = true; break; }
+                }
+                canvas.style.cursor = near ? 'pointer' : 'default';
+            } else if (state === 'PAUSED') {
+                const near = findNearVertex(mousePos);
+                canvas.style.cursor = near !== -1 ? 'pointer' : 'default';
+            } else if (currentLevel === 8 && state2 === 'PAUSED') {
+                const near = findNearVertex2(mousePos);
+                canvas.style.cursor = near !== -1 ? 'pointer' : 'default';
+            } else if (pausedTrap >= 0) {
+                const near = findNearTrapVertex(mousePos, traps[pausedTrap]);
+                canvas.style.cursor = near !== -1 ? 'pointer' : 'default';
+            } else if (currentLevel >= 4 && currentLevel <= 7) {
+                let over = pointInPolygon(mousePos, corners);
+                if (!over) {
+                    for (const t of traps) {
+                        if (t.state === 'ROTATING' && pointInPolygon(mousePos, t.corners)) { over = true; break; }
+                    }
+                }
+                canvas.style.cursor = over ? 'pointer' : 'default';
+            } else if (currentLevel === 8) {
+                canvas.style.cursor = (pointInPolygon(mousePos, corners) || pointInPolygon(mousePos, corners2)) ? 'pointer' : 'default';
+            } else if (currentLevel === 9) {
+                canvas.style.cursor = pointInPolygon(mousePos, corners) ? 'pointer' : 'default';
+            } else {
+                canvas.style.cursor = pointInPolygon(mousePos, corners) ? 'pointer' : 'default';
+            }
+        });
+
+        canvas.addEventListener('mouseup', e => {
+            if (!mouseDown) return;
+            mouseDown = false;
+
+            const rect = canvas.getBoundingClientRect();
+            const pos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+            if (pausedTrap >= 0) {
+                const near = findNearTrapVertex(pos, traps[pausedTrap]);
+                if (near !== -1) {
+                    if (traps[pausedTrap].motion === 'scale') setTrapScaleAnchor(traps[pausedTrap], near);
+                    else setTrapAnchor(traps[pausedTrap], near);
+                }
+                traps[pausedTrap].state = 'ROTATING';
+                pausedTrap = -1;
+            } else if (currentLevel === 8 && state2 === 'PAUSED') {
+                const near = findNearVertex2(pos);
+                if (near !== -1) setScaleAnchor2(near);
+                state2 = 'ROTATING';
+            } else if (currentLevel === 9 && state === 'PAUSED') {
+                for (const a of alignAnchors) {
+                    const dx = pos.x - a.x, dy = pos.y - a.y;
+                    if (dx * dx + dy * dy < VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS) {
+                        if (a.dir === 'left' || a.dir === 'right') hAlign = a.dir;
+                        else vAlign = a.dir;
+                        setHeroTarget();
+                        break;
+                    }
+                }
+                state = 'ROTATING';
+            } else {
+                const near = findNearVertex(pos);
+                if (near !== -1) {
+                    if (heroMotion === 'scale') setScaleAnchor(near);
+                    else setNewAnchor(near);
+                }
+                state = 'ROTATING';
+            }
+            canvas.style.cursor = 'default';
+        });
+
+        function pointInPolygon(p, poly) {
+            let inside = false;
+            for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                const xi = poly[i].x, yi = poly[i].y;
+                const xj = poly[j].x, yj = poly[j].y;
+                if ((yi > p.y) !== (yj > p.y) && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi) {
+                    inside = !inside;
+                }
+            }
+            return inside;
+        }
+
+        function findNearVertex(pos) {
+            for (let i = 0; i < 4; i++) {
+                const dx = pos.x - corners[i].x;
+                const dy = pos.y - corners[i].y;
+                if (dx * dx + dy * dy < VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS) return i;
+            }
+            return -1;
+        }
+
+        function findNearVertex2(pos) {
+            for (let i = 0; i < 4; i++) {
+                const dx = pos.x - corners2[i].x;
+                const dy = pos.y - corners2[i].y;
+                if (dx * dx + dy * dy < VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS) return i;
+            }
+            return -1;
+        }
+
+        function findNearTrapVertex(pos, trap) {
+            for (let i = 0; i < 4; i++) {
+                const dx = pos.x - trap.corners[i].x;
+                const dy = pos.y - trap.corners[i].y;
+                if (dx * dx + dy * dy < VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS) return i;
+            }
+            return -1;
+        }
+
+        /* ── Drawing ── */
+
+        function draw() {
+            ctx.clearRect(0, 0, canvasW, canvasH);
+
+            if (currentLevel === 9) drawLevel9();
+            else if (currentLevel === 1 || currentLevel === 5) drawTarget();
+            else if (currentLevel === 2) drawLevel2Targets();
+            else if (currentLevel === 3 || currentLevel === 6) { drawTarget(); drawLevel3Traps(); }
+            else if (currentLevel === 4) { drawTarget(); drawLevel4Traps(); }
+            else if (currentLevel === 7) { drawTarget(); drawLevel4Traps(); }
+            else if (currentLevel === 8) drawTarget();
+            if (currentLevel !== 9) drawRect();
+            if (currentLevel === 8) drawHero2();
+            drawFloatingTexts();
+            if (state === 'PAUSED' && currentLevel !== 9) drawVertices();
+            else if (currentLevel === 8 && state2 === 'PAUSED') drawVertices2();
+            else if (pausedTrap >= 0) drawTrapVertices(traps[pausedTrap]);
+        }
+
+        function drawRect() {
+            const p = corners;
+            const useScale = heroMotion === 'scale';
+            const img = useScale ? fakeAnchorImg : anchorImg;
+            const loaded = useScale ? fakeAnchorLoaded : imgLoaded;
+            const imgW = img.width || 1;
+            const imgH = img.height || 1;
+
+            ctx.save();
+            if (loaded && imgW > 1 && imgH > 1) {
+                const a = (p[1].x - p[0].x) / imgW;
+                const b = (p[1].y - p[0].y) / imgW;
+                const c = (p[3].x - p[0].x) / imgH;
+                const d = (p[3].y - p[0].y) / imgH;
+                ctx.setTransform(a, b, c, d, p[0].x, p[0].y);
+                ctx.drawImage(img, 0, 0, imgW, imgH, 0, 0, imgW, imgH);
+            } else {
+                const grad = ctx.createLinearGradient(p[0].x, p[0].y, p[2].x, p[2].y);
+                grad.addColorStop(0, '#3a7bd5');
+                grad.addColorStop(1, '#2c3e80');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.moveTo(p[0].x, p[0].y);
+                for (let i = 1; i < 4; i++) ctx.lineTo(p[i].x, p[i].y);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.restore();
+
+            if (state === 'PAUSED') {
+                ctx.beginPath();
+                ctx.moveTo(p[0].x, p[0].y);
+                for (let i = 1; i < 4; i++) ctx.lineTo(p[i].x, p[i].y);
+                ctx.closePath();
+                ctx.strokeStyle = '#5b9fe0';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+            }
+        }
+
+        function drawHero2() {
+            const p = corners2;
+            if (!fakeAnchorLoaded || fakeAnchorImg.width <= 1) return;
+            const iw = fakeAnchorImg.width, ih = fakeAnchorImg.height;
+            ctx.save();
+            const a = (p[1].x - p[0].x) / iw;
+            const b = (p[1].y - p[0].y) / iw;
+            const c = (p[3].x - p[0].x) / ih;
+            const d = (p[3].y - p[0].y) / ih;
+            ctx.setTransform(a, b, c, d, p[0].x, p[0].y);
+            ctx.drawImage(fakeAnchorImg, 0, 0, iw, ih, 0, 0, iw, ih);
+            ctx.restore();
+
+            if (state2 === 'PAUSED') {
+                ctx.beginPath();
+                ctx.moveTo(p[0].x, p[0].y);
+                for (let i = 1; i < 4; i++) ctx.lineTo(p[i].x, p[i].y);
+                ctx.closePath();
+                ctx.strokeStyle = '#5b9fe0';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+            }
+        }
+
+        function drawLevel9() {
+            const p = corners;
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 3]);
+            ctx.strokeRect(p[0].x, p[0].y, p[1].x - p[0].x, p[3].y - p[0].y);
+            ctx.setLineDash([]);
+
+            drawTarget();
+
+            const p2 = corners2;
+            const iw = anchorImg.width || 1, ih = anchorImg.height || 1;
+            ctx.save();
+            if (imgLoaded && iw > 1 && ih > 1) {
+                const a = (p2[1].x - p2[0].x) / iw;
+                const b = (p2[1].y - p2[0].y) / iw;
+                const c = (p2[3].x - p2[0].x) / ih;
+                const d = (p2[3].y - p2[0].y) / ih;
+                ctx.setTransform(a, b, c, d, p2[0].x, p2[0].y);
+                ctx.drawImage(anchorImg, 0, 0, iw, ih, 0, 0, iw, ih);
+            }
+            ctx.restore();
+
+            if (state === 'PAUSED') {
+                for (const a of alignAnchors) {
+                    const dx = mousePos.x - a.x, dy = mousePos.y - a.y;
+                    const hovered = dx * dx + dy * dy < VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS;
+                    const r = hovered ? 9 : 6;
+                    const isActive = (a.dir === 'left' || a.dir === 'right') ? a.dir === hAlign : a.dir === vAlign;
+                    ctx.beginPath();
+                    ctx.arc(a.x, a.y, r, 0, Math.PI * 2);
+                    if (isActive) {
+                        ctx.fillStyle = '#ff6b6b';
+                        ctx.strokeStyle = '#ff4444';
+                        ctx.lineWidth = 3;
+                    } else {
+                        ctx.fillStyle = hovered ? '#5dfcd1' : '#4ecdc4';
+                        ctx.strokeStyle = '#3db8a8';
+                        ctx.lineWidth = 2;
+                    }
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawVertices2() {
+            for (let i = 0; i < 4; i++) {
+                const c = corners2[i];
+                const hovered = findNearVertex2(mousePos) === i;
+                const isAnchor = i === scaleAnchorIdx2;
+                const r = hovered ? 11 : 8;
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+                if (isAnchor) {
+                    ctx.fillStyle = '#ff6b6b';
+                    ctx.strokeStyle = '#ff4444';
+                    ctx.lineWidth = 3;
+                } else {
+                    ctx.fillStyle = hovered ? '#5dfcd1' : '#4ecdc4';
+                    ctx.strokeStyle = '#3db8a8';
+                    ctx.lineWidth = 2;
+                }
+                ctx.fill();
+                ctx.stroke();
+            }
+            const anchor = corners2[scaleAnchorIdx2];
+            const pulseR = 16 + Math.sin(Date.now() * 0.006) * 3;
+            ctx.beginPath();
+            ctx.arc(anchor.x, anchor.y, pulseR, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255,107,107,0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function drawRotationArrow(cx, cy, r, alpha) {
+            const start = -Math.PI * 0.6;
+            const end = Math.PI * 0.6;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, start, end);
+            ctx.strokeStyle = `rgba(255,255,255,${0.55 * alpha})`;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            const tipX = cx + r * Math.cos(end);
+            const tipY = cy + r * Math.sin(end);
+            const ah = 10;
+            const ax = tipX - ah * Math.cos(end + 0.8);
+            const ay = tipY - ah * Math.sin(end + 0.8);
+            const bx = tipX - ah * Math.cos(end - 0.8);
+            const by = tipY - ah * Math.sin(end - 0.8);
+            ctx.beginPath();
+            ctx.moveTo(tipX, tipY);
+            ctx.lineTo(ax, ay);
+            ctx.lineTo(bx, by);
+            ctx.closePath();
+            ctx.fillStyle = `rgba(255,255,255,${0.55 * alpha})`;
+            ctx.fill();
+        }
+
+        function drawVertices() {
+            const showAnchor = heroMotion === 'scale' ? scaleAnchorIdx : anchorIdx;
+            if (heroMotion === 'rotate') {
+                const cx = (corners[0].x + corners[2].x) / 2;
+                const cy = (corners[0].y + corners[2].y) / 2;
+                const arrowR = Math.min(W, H) * 0.22;
+                drawRotationArrow(cx, cy, arrowR, 1);
+            }
+
+            for (let i = 0; i < 4; i++) {
+                const c = corners[i];
+                const hovered = findNearVertex(mousePos) === i;
+                const isAnchor = i === showAnchor;
+                const r = hovered ? 11 : 8;
+
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+
+                if (isAnchor) {
+                    ctx.fillStyle = '#ff6b6b';
+                    ctx.strokeStyle = '#ff4444';
+                    ctx.lineWidth = 3;
+                } else {
+                    ctx.fillStyle = hovered ? '#5dfcd1' : '#4ecdc4';
+                    ctx.strokeStyle = '#3db8a8';
+                    ctx.lineWidth = 2;
+                }
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            const anchor = corners[showAnchor];
+            const pulseR = 16 + Math.sin(Date.now() * 0.006) * 3;
+            ctx.beginPath();
+            ctx.arc(anchor.x, anchor.y, pulseR, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255,107,107,0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function drawTarget() {
+            if (cooldownTimer > 0) return;
+
+            ctx.beginPath();
+            ctx.rect(target.x, target.y, target.w, target.h);
+            ctx.strokeStyle = '#f0a500';
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([8, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = 'rgba(240, 165, 0, 0.06)';
+            ctx.fill();
+
+            const pad = Math.min(target.w, target.h) * 0.15;
+            const innerH = target.h - pad * 2;
+            const innerW = target.w - pad * 2;
+            const showFake = heroMotion === 'scale' || currentLevel === 8;
+            const showAnchor = heroMotion !== 'scale' || currentLevel === 8;
+
+            if (showAnchor && imgLoaded && anchorImg.width > 1) {
+                const h = innerH;
+                const w = h * anchorImg.width / anchorImg.height;
+                const sx = currentLevel === 8 ? target.x + target.w / 2 - innerW * 0.1 - w / 2 : target.x + pad;
+                ctx.save(); ctx.globalAlpha = 0.10;
+                ctx.drawImage(anchorImg, sx, target.y + (target.h - h) / 2, w, h);
+                ctx.restore();
+            }
+
+            if (showFake && fakeAnchorLoaded && fakeAnchorImg.width > 1) {
+                const h = innerH;
+                const w = h * fakeAnchorImg.width / fakeAnchorImg.height;
+                const sx = currentLevel === 8 ? target.x + target.w / 2 + innerW * 0.1 - w / 2 : target.x + pad;
+                ctx.save(); ctx.globalAlpha = 0.10;
+                ctx.drawImage(fakeAnchorImg, sx, target.y + (target.h - h) / 2, w, h);
+                ctx.restore();
+            }
+        }
+
+        function drawLevel2Targets() {
+            for (const t of targets) {
+                const grad = ctx.createLinearGradient(t.x, t.y, t.x + t.w, t.y + t.h);
+                grad.addColorStop(0, '#e85d75');
+                grad.addColorStop(1, '#c0392b');
+
+                ctx.fillStyle = grad;
+                ctx.fillRect(t.x, t.y, t.w, t.h);
+
+                ctx.strokeStyle = '#ff7b8a';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(t.x, t.y, t.w, t.h);
+            }
+        }
+
+        function drawLevel3Traps() {
+            for (const t of traps) {
+                drawTrapWarped(t.corners);
+            }
+        }
+
+        function drawLevel4Traps() {
+            for (const t of traps) {
+                drawTrapWarped(t.corners);
+            }
+        }
+
+        function drawStaticTraps() {
+            for (const t of traps) {
+                const minX = Math.min(...t.corners.map(c => c.x));
+                const minY = Math.min(...t.corners.map(c => c.y));
+                const maxX = Math.max(...t.corners.map(c => c.x));
+                drawTrapImage(minX, minY, maxX - minX, t.h);
+            }
+        }
+
+        function drawTrapImage(tx, ty, tw, th) {
+            if (trapImgLoaded && trapImg.width > 1) {
+                ctx.drawImage(trapImg, tx, ty, tw, th);
+            } else {
+                const grad = ctx.createLinearGradient(tx, ty, tx + tw, ty + th);
+                grad.addColorStop(0, '#8b2252');
+                grad.addColorStop(1, '#5c0a30');
+                ctx.fillStyle = grad;
+                ctx.fillRect(tx, ty, tw, th);
+                ctx.strokeStyle = '#d94f7c';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(tx, ty, tw, th);
+            }
+        }
+
+        function drawTrapWarped(p) {
+            const iw = trapImg.width || 1, ih = trapImg.height || 1;
+            ctx.save();
+            if (trapImgLoaded && iw > 1 && ih > 1) {
+                const a = (p[1].x - p[0].x) / iw;
+                const b = (p[1].y - p[0].y) / iw;
+                const c = (p[3].x - p[0].x) / ih;
+                const d = (p[3].y - p[0].y) / ih;
+                ctx.setTransform(a, b, c, d, p[0].x, p[0].y);
+                ctx.drawImage(trapImg, 0, 0, iw, ih, 0, 0, iw, ih);
+            } else {
+                const grad = ctx.createLinearGradient(p[0].x, p[0].y, p[2].x, p[2].y);
+                grad.addColorStop(0, '#8b2252');
+                grad.addColorStop(1, '#5c0a30');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.moveTo(p[0].x, p[0].y);
+                for (let i = 1; i < 4; i++) ctx.lineTo(p[i].x, p[i].y);
+                ctx.closePath();
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        function drawTrapVertices(trap) {
+            const isScale = trap.motion === 'scale';
+            const showAnchor = isScale ? trap.scaleAnchorIdx : trap.anchorIdx;
+            if (trap.motion !== 'static') {
+                const cx = (trap.corners[0].x + trap.corners[2].x) / 2;
+                const cy = (trap.corners[0].y + trap.corners[2].y) / 2;
+                const arrowR = Math.min(trap.w, trap.h) * 0.22;
+                drawRotationArrow(cx, cy, arrowR, 1);
+            }
+
+            for (let i = 0; i < 4; i++) {
+                const c = trap.corners[i];
+                const hovered = findNearTrapVertex(mousePos, trap) === i;
+                const isAnchor = i === showAnchor;
+                const r = hovered ? 9 : 6;
+
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+                if (isAnchor) {
+                    ctx.fillStyle = '#ff9f43';
+                    ctx.strokeStyle = '#ee5a24';
+                    ctx.lineWidth = 2.5;
+                } else {
+                    ctx.fillStyle = hovered ? '#feca57' : '#ffc048';
+                    ctx.strokeStyle = '#e1a020';
+                    ctx.lineWidth = 2;
+                }
+                ctx.fill();
+                ctx.stroke();
+            }
+            const anchor = trap.corners[showAnchor];
+            const pulseR = 14 + Math.sin(Date.now() * 0.006) * 3;
+            ctx.beginPath();
+            ctx.arc(anchor.x, anchor.y, pulseR, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255,159,67,0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function drawScore() {
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.font = 'bold 22px "Segoe UI", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('得分: ' + score, canvasW / 2, 36);
+        }
+
+        function drawFloatingTexts() {
+            for (const ft of floatingTexts) {
+                const isFail = ft.type === 'failure';
+                ctx.fillStyle = isFail
+                    ? `rgba(255, 80, 80, ${ft.opacity})`
+                    : `rgba(255, 215, 0, ${ft.opacity})`;
+                ctx.font = 'bold 28px "Segoe UI", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(isFail ? 'Failure!' : 'Success!', ft.x, ft.y);
+            }
+        }
+
+        /* ── Loop ── */
+
+        function update() {
+            if (currentLevel === 9) { updateLevel9Motion(); }
+            else {
+                if (currentLevel === 8) {
+                if (state === 'ROTATING') angle += ROTATION_SPEED * speedMultiplier;
+                updateCorners();
+                updateLevel8Hero2();
+            } else if (heroMotion === 'scale') {
+                if (state === 'ROTATING') {
+                    scalePhase += scaleDir * SCALE_SPEED * speedMultiplier;
+                    scaleValue = 0.5 + 0.25 * Math.sin(scalePhase);
+                }
+                updateLevel5Corners();
+            } else {
+                if (state === 'ROTATING') {
+                    angle += ROTATION_SPEED * speedMultiplier;
+                }
+                updateCorners();
+            }
+
+            if (currentLevel === 3 || currentLevel === 6) updateLevel3Traps();
+            else if (currentLevel === 4) updateLevel4Traps();
+            else if (currentLevel === 7) updateLevel7Traps();
+            }
+
+            if (state === 'ROTATING' && cooldownTimer <= 0) {
+                if (currentLevel === 2) {
+                    const hitIdx = checkLevel2Success();
+                    if (hitIdx !== -1) { score++; showVictory(); }
+                } else if (currentLevel === 3) {
+                    if (checkSuccess()) { score++; showVictory(); }
+                    else if (checkLevel3Failure()) {
+                        const cx = (corners[0].x + corners[2].x) / 2;
+                        const cy = (corners[0].y + corners[2].y) / 2;
+                        floatingTexts.push({ x: cx, y: cy, opacity: 1, vy: -1.4, type: 'failure' });
+                        cooldownTimer = COOLDOWN_FRAMES;
+                    }
+                } else if (currentLevel === 4) {
+                    if (checkLevel4Success()) { score++; showVictory(); }
+                    else if (checkLevel4Failure()) {
+                        const cx = (corners[0].x + corners[2].x) / 2;
+                        const cy = (corners[0].y + corners[2].y) / 2;
+                        floatingTexts.push({ x: cx, y: cy, opacity: 1, vy: -1.4, type: 'failure' });
+                        cooldownTimer = COOLDOWN_FRAMES;
+                    }
+                } else if (currentLevel === 6) {
+                    if (checkSuccess()) { score++; showVictory(); }
+                    else if (checkLevel6Failure()) {
+                        const cx = (corners[0].x + corners[2].x) / 2;
+                        const cy = (corners[0].y + corners[2].y) / 2;
+                        floatingTexts.push({ x: cx, y: cy, opacity: 1, vy: -1.4, type: 'failure' });
+                        cooldownTimer = COOLDOWN_FRAMES;
+                    }
+                } else if (currentLevel === 7) {
+                    if (checkSuccess()) { score++; showVictory(); }
+                    else if (checkLevel7Failure()) {
+                        const cx = (corners[0].x + corners[2].x) / 2;
+                        const cy = (corners[0].y + corners[2].y) / 2;
+                        floatingTexts.push({ x: cx, y: cy, opacity: 1, vy: -1.4, type: 'failure' });
+                        cooldownTimer = COOLDOWN_FRAMES;
+                    }
+                } else if (currentLevel === 8) {
+                    if (checkLevel8Success()) { score++; showVictory(); }
+                } else if (currentLevel === 9) {
+                    if (checkLevel9Success()) { score++; showVictory(); }
+                } else {
+                    if (checkSuccess()) { score++; showVictory(); }
+                }
+            }
+
+            if (cooldownTimer > 0) {
+                cooldownTimer--;
+                if (cooldownTimer === 0) {
+                    if (currentLevel === 3) resetLevel3();
+                    else if (currentLevel === 4) resetLevel4();
+                    else if (currentLevel === 6) resetLevel6();
+                    else if (currentLevel === 7) resetLevel7();
+                }
+            }
+
+            for (const ft of floatingTexts) {
+                ft.y += ft.vy;
+                ft.opacity -= 0.012;
+            }
+            floatingTexts = floatingTexts.filter(ft => ft.opacity > 0);
+        }
+
+        function loop() {
+            if (gameState === 'PLAYING') {
+                update();
+                draw();
+            }
+            requestAnimationFrame(loop);
+        }
+
+        /* ── Settings ── */
+
+        const settingsBtn = document.getElementById('settingsBtn');
+        const speedMenu = document.getElementById('speedMenu');
+        const speedItems = speedMenu.querySelectorAll('.speed-item');
+
+        settingsBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            speedMenu.classList.toggle('open');
+        });
+
+        document.addEventListener('click', () => {
+            speedMenu.classList.remove('open');
+        });
+
+        speedItems.forEach(item => {
+            item.addEventListener('click', e => {
+                e.stopPropagation();
+                speedMultiplier = parseFloat(item.dataset.speed);
+                speedItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                speedMenu.classList.remove('open');
+            });
+        });
+
+        const scaleSlider = document.getElementById('scaleSlider');
+        const scaleVal = document.getElementById('scaleVal');
+        scaleSlider.addEventListener('input', () => {
+            const pct = parseInt(scaleSlider.value);
+            scaleVal.textContent = pct + '%';
+        });
+        scaleSlider.addEventListener('change', () => {
+            const pct = parseInt(scaleSlider.value);
+            scaleVal.textContent = pct + '%';
+            applyScale(pct / 100);
+        });
+
+        /* ── Victory ── */
+
+        const victoryOverlay = document.getElementById('victoryOverlay');
+        const victoryBtn = document.getElementById('victoryBtn');
+
+        function showVictory() {
+            gameState = 'VICTORY';
+            victoryOverlay.classList.remove('hidden');
+            if (currentLevel >= TOTAL_LEVELS) {
+                victoryBtn.textContent = '返回主菜单';
+                victoryBtn.onclick = backToMenu;
+            } else {
+                victoryBtn.textContent = '下一关';
+                victoryBtn.onclick = () => {
+                    victoryOverlay.classList.add('hidden');
+                    startLevel(currentLevel + 1);
+                };
+            }
+        }
+
+        const titleOverlay = document.getElementById('titleOverlay');
+        titleOverlay.addEventListener('click', () => {
+            titleOverlay.classList.add('hidden');
+            gameState = 'MENU';
+            menuOverlay.classList.remove('hidden');
+        });
+
+        /* ── Level Selection ── */
+
+        const menuOverlay = document.getElementById('menuOverlay');
+        const backBtn = document.getElementById('backBtn');
+
+        function startLevel(level) {
+            currentLevel = level;
+            gameState = 'PLAYING';
+            score = 0;
+            floatingTexts = [];
+            cooldownTimer = 0;
+            state = 'ROTATING';
+            angle = 0;
+            anchorIdx = 0;
+            traps = [];
+            targets = [];
+            menuOverlay.classList.add('hidden');
+            backBtn.classList.remove('hidden');
+            if (level === 3) {
+                initLevel3();
+            } else if (level === 4) {
+                initLevel4();
+            } else if (level === 5) {
+                initLevel5();
+            } else if (level === 6) {
+                initLevel6();
+            } else if (level === 7) {
+                initLevel7();
+            } else if (level === 8) {
+                initLevel8();
+            } else if (level === 9) {
+                initLevel9();
+            } else {
+                initCorners();
+                if (level === 1) {
+                    generateTarget();
+                } else {
+                    target = { x: 0, y: 0, w: W * TARGET_SCALE, h: H * TARGET_SCALE };
+                    generateLevel2Targets();
+                }
+            }
+        }
+
+        function backToMenu() {
+            gameState = 'MENU';
+            menuOverlay.classList.remove('hidden');
+            backBtn.classList.add('hidden');
+            victoryOverlay.classList.add('hidden');
+        }
+
+        document.querySelectorAll('.menu-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                startLevel(parseInt(btn.dataset.level));
+            });
+        });
+
+        backBtn.addEventListener('click', backToMenu);
+
+        /* ── Init ── */
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        canvasW = canvas.width;
+        canvasH = canvas.height;
+        window.addEventListener('resize', resize);
+        loop();
+    </script>
+</body>
+</html>
