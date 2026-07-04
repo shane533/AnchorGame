@@ -416,7 +416,7 @@
         const BASE_W = 256;
         const BASE_H = 256;
         const ROTATION_SPEED = 0.012;
-        const BASE_VERTEX_RADIUS = 'ontouchstart' in window ? 28 : 14;
+        const BASE_VERTEX_RADIUS = 'ontouchstart' in window ? 128 : 64;
         const TARGET_SCALE = 2;
         const COOLDOWN_FRAMES = 60;
         const BASE_L2_TW = 180, BASE_L2_TH = 180, L2_COUNT = 3;
@@ -491,7 +491,7 @@
         let mapEntryCooldown = 0;
         let irisActive = false, irisRadius = 0, irisDone = false;
         let irisTargetEntry = null;
-        let introPhase = 0, introTimer = 0, fallY = 0, fallVY = 0, cameraPan = 0, rightUpY = 0, dialogText = '';
+        let introPhase = 0, introTimer = 0, fallY = 0, fallVY = 0, cameraPan = 0, dialogText = '', fadeAlpha = 0;
         let mapPhase = 0;
         let tutPhase = 0;
         let target = { x: 0, y: 0, w: W * TARGET_SCALE, h: H * TARGET_SCALE };
@@ -2505,16 +2505,23 @@
             }
             if (gameState === 'INTRO') {
                 if (introPhase === 0) {
-                    fallVY += 1.2;
-                    fallY += fallVY;
-                    rightUpY += 1.5;
-                    if (fallY >= canvasH * 0.6) {
-                        fallY = canvasH * 0.6;
-                        introPhase = 1; introTimer = 30;
+                    cameraPan += 12;
+                    fallY += 0.2;
+                    if (canvasH + W * 1.6 - cameraPan <= canvasH * 0.2) {
+                        cameraPan = canvasH + W * 1.6 - canvasH * 0.2;
+                        introPhase = 1; fallVY = 5;
                     }
                 } else if (introPhase === 1) {
+                    fallVY += 1.2; fallY += fallVY;
+                    if (fallY >= canvasH / 2) { fallY = canvasH / 2; introPhase = 2; introTimer = 30; }
+                } else if (introPhase === 2) {
                     introTimer--;
-                    if (introTimer <= 0) { introPhase = 2; gameState = 'MAP'; state = 'ROTATING'; dialogText = '按住锚以切换其锚点，改变运动轨迹'; document.getElementById('info').textContent = dialogText; introTimer = 0; }
+                    if (introTimer <= 0) {
+                        introPhase = 3; gameState = 'MAP'; state = 'ROTATING';
+                        dialogText = '按住锚以切换其锚点，改变运动轨迹，进入目标点';
+                        document.getElementById('info').textContent = dialogText;
+                        initMap();
+                    }
                 }
                 return;
             }
@@ -2812,12 +2819,27 @@
         }
 
         function drawIntro() {
-            const heroW = W, heroH = H;
-            const anchorX = canvasW / 2 - 200, anchorY = fallY;
-            const rightBaseY = canvasH * 0.38;
+            const targetY = canvasH + W * 1.6 - cameraPan;
+            const tw = W * 1.6, th = H * 1.6;
+            ctx.strokeStyle = 'rgba(240,165,0,0.4)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 3]);
+            ctx.strokeRect(canvasW * 0.2 - tw / 2, targetY - th / 2, tw, th);
+            ctx.setLineDash([]);
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.font = 'bold 64px "Segoe UI", sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('1-1', canvasW * 0.2, targetY);
+
+            const anchorStartX = canvasW / 2 - 169;
+            const anchorEndX = canvasW / 2;
+            const progress = introPhase >= 1 ? 1 : Math.min(1, cameraPan / (canvasH + W * 1.6 - canvasH * 0.2));
+            const anchorX = anchorStartX + (anchorEndX - anchorStartX) * progress;
+            const anchorY = fallY;
 
             if (imgLoaded && anchorImg.width > 1) {
-                const p = [{ x: anchorX - heroW/2, y: anchorY - heroH/2 }, { x: anchorX + heroW/2, y: anchorY - heroH/2 }, { x: anchorX + heroW/2, y: anchorY + heroH/2 }, { x: anchorX - heroW/2, y: anchorY + heroH/2 }];
+                const hw = W / 2, hh = H / 2;
+                const p = [{ x: anchorX - hw, y: anchorY - hh }, { x: anchorX + hw, y: anchorY - hh }, { x: anchorX + hw, y: anchorY + hh }, { x: anchorX - hw, y: anchorY + hh }];
                 ctx.save();
                 const iw = anchorImg.width, ih = anchorImg.height;
                 const a = (p[1].x - p[0].x) / iw, b = (p[1].y - p[0].y) / iw;
@@ -2827,30 +2849,27 @@
                 ctx.restore();
             }
 
-            const rightY = rightBaseY - rightUpY;
-            const rightX = anchorX + heroW / 2 + 10;
-            const alpha = Math.max(0, 1 - rightUpY / 200);
-            ctx.globalAlpha = alpha;
-            ctx.fillStyle = 'rgba(255,255,255,0.85)';
-            ctx.font = '64px "Segoe UI", sans-serif';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('的大', rightX, rightY);
-            const textW = ctx.measureText('的大').width;
-
-            if (fakeAnchorLoaded && fakeAnchorImg.width > 1) {
-                const fw = 128, fh = 128;
-                const fx = rightX + textW, fy = rightY - fh / 2;
-                ctx.drawImage(fakeAnchorImg, fx, fy, fw, fh);
-                ctx.fillText('险', fx + fw, rightY);
+            const rightY = canvasH * 0.38 - cameraPan;
+            if (rightY > -200) {
+                const rx = canvasW / 2 + 30;
+                ctx.fillStyle = 'rgba(255,255,255,0.85)';
+                ctx.font = '64px "Segoe UI", sans-serif';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('\u7684\u5927', rx - 70, rightY);
+                if (fakeAnchorLoaded && fakeAnchorImg.width > 1) {
+                    const fw = 128, fh = 128;
+                    ctx.drawImage(fakeAnchorImg, rx, rightY - fh / 2, fw, fh);
+                    ctx.fillText('\u9669', rx + fw, rightY);
+                }
             }
-            ctx.globalAlpha = 1;
 
-            if (introPhase >= 1) {
-                const infoAlpha = introPhase === 2 ? 1 : Math.max(0, (30 - introTimer) / 30);
-                ctx.fillStyle = `rgba(255,255,255,${0.7 * infoAlpha})`;
+            if (introPhase >= 2) fadeAlpha = Math.min(1, fadeAlpha + 0.033);
+            const alpha = introPhase === 3 ? 1 : fadeAlpha;
+            if (alpha > 0) {
+                ctx.fillStyle = `rgba(255,255,255,${0.7 * alpha})`;
                 ctx.font = '28px "Segoe UI", sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText('按住锚以切换其锚点，改变运动轨迹', canvasW / 2, canvasH * 0.85);
+                ctx.fillText('\u6309\u4f4f\u951a\u4ee5\u5207\u6362\u5176\u951a\u70b9\uff0c\u6539\u53d8\u8fd0\u52a8\u8f68\u8ff9', canvasW / 2, canvasH * 0.85);
             }
         }
 
@@ -2919,10 +2938,11 @@
         titleOverlay.addEventListener('click', () => {
             titleOverlay.classList.add('hidden');
             gameState = 'INTRO';
-            introPhase = 0; introTimer = 0;
-            fallY = canvasH * 0.38; fallVY = 0; rightUpY = 0;
+            introPhase = 0; introTimer = 0; fadeAlpha = 0;
+            fallY = canvasH * 0.38; fallVY = 0; cameraPan = 0;
             dialogText = '';
             initMap();
+            document.getElementById('info').textContent = '';
             state = 'PAUSED';
         });
 
