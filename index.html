@@ -282,7 +282,7 @@
             font-family: inherit;
             transition: background 0.15s, color 0.15s;
         }
-        .debug-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .debug-panel.hidden { display: none; }
 
         .landscape-hint {
             display: none;
@@ -312,7 +312,6 @@
         }
 
         @media (max-width: 768px) {
-            .debug-panel { display: none; }
             .title-text { font-size: 40px; }
             .title-icon { width: 80px; height: 80px; }
         }
@@ -342,7 +341,7 @@
         </div>
     </div>
     <button class="back-btn hidden" id="backBtn">← 返回选关</button>
-    <div class="debug-panel" id="debugPanel">
+    <div class="debug-panel hidden" id="debugPanel">
         <div class="debug-col">
             <button class="debug-btn" data-ch="0">1-1</button>
             <button class="debug-btn" data-ch="1">1-2</button>
@@ -381,6 +380,10 @@
                 <span class="scale-label">缩放</span>
                 <input type="range" class="scale-slider" id="scaleSlider" min="25" max="100" value="50" step="1">
                 <span class="scale-val" id="scaleVal">50%</span>
+            </div>
+            <div class="scale-row">
+                <span class="scale-label">Debug</span>
+                <input type="checkbox" id="debugToggle">
             </div>
         </div>
     </div>
@@ -506,7 +509,10 @@
         let scaleValue2 = 0.5, scalePhase2 = 0, scaleAnchorIdx2 = 2, scaleDir2 = 1;
         let scaleBaseOffsets2 = [];
 
-        applyScale(0.5);
+        const initScale = window.innerWidth < 500 ? 0.35 : 0.5;
+        applyScale(initScale);
+        scaleSlider.value = Math.round(initScale * 100);
+        scaleVal.textContent = scaleSlider.value + '%';
 
         const anchorImg = new Image();
         anchorImg.src = 'anchor.webp';
@@ -1894,6 +1900,24 @@
             canvas.style.cursor = 'default';
         });
 
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            const t = e.touches[0];
+            const me = new MouseEvent('mousedown', { clientX: t.clientX, clientY: t.clientY });
+            canvas.dispatchEvent(me);
+        }, { passive: false });
+        canvas.addEventListener('touchmove', e => {
+            e.preventDefault();
+            const t = e.touches[0];
+            const me = new MouseEvent('mousemove', { clientX: t.clientX, clientY: t.clientY });
+            canvas.dispatchEvent(me);
+        }, { passive: false });
+        canvas.addEventListener('touchend', e => {
+            e.preventDefault();
+            const me = new MouseEvent('mouseup', {});
+            canvas.dispatchEvent(me);
+        }, { passive: false });
+
         function pointInPolygon(p, poly) {
             let inside = false;
             for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -2697,6 +2721,13 @@
             applyScale(pct / 100);
         });
 
+        const debugToggle = document.getElementById('debugToggle');
+        const debugPanel = document.getElementById('debugPanel');
+        debugToggle.addEventListener('change', () => {
+            if (debugToggle.checked) debugPanel.classList.remove('hidden');
+            else debugPanel.classList.add('hidden');
+        });
+
         /* ── Victory ── */
 
         const resultOverlay = document.getElementById('resultOverlay');
@@ -2963,6 +2994,9 @@
         checkOrientation();
         window.addEventListener('resize', checkOrientation);
         window.addEventListener('orientationchange', checkOrientation);
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+        }
     </script>
     <div class="landscape-hint" id="landscapeHint">
         <div class="landscape-icon"></div>
