@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#1a1a2e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -21,17 +21,17 @@
         canvas { display: block; }
         #info {
             position: fixed;
-            bottom: 24px;
+            bottom: calc(24px + env(safe-area-inset-bottom, 0px));
             left: 50%;
             transform: translateX(-50%);
             color: rgba(255,255,255,0.5);
-            font-size: 14px;
+            font-size: 28px;
             pointer-events: none;
             letter-spacing: 0.5px;
         }
         .settings-wrap {
             position: fixed;
-            top: 12px;
+            top: calc(12px + env(safe-area-inset-top, 0px));
             right: 16px;
             z-index: 10;
             user-select: none;
@@ -197,7 +197,7 @@
         }
         .back-btn {
             position: fixed;
-            top: 12px;
+            top: calc(12px + env(safe-area-inset-top, 0px));
             left: 16px;
             z-index: 10;
             padding: 6px 14px;
@@ -386,7 +386,7 @@
             </div>
         </div>
     </div>
-    <div id="info">点击矩形暂停 · 拖动到顶点切换锚点</div>
+    <div id="info"></div>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -416,7 +416,7 @@
         const BASE_W = 256;
         const BASE_H = 256;
         const ROTATION_SPEED = 0.012;
-        const BASE_VERTEX_RADIUS = 14;
+        const BASE_VERTEX_RADIUS = 'ontouchstart' in window ? 28 : 14;
         const TARGET_SCALE = 2;
         const COOLDOWN_FRAMES = 60;
         const BASE_L2_TW = 180, BASE_L2_TH = 180, L2_COUNT = 3;
@@ -491,6 +491,7 @@
         let mapEntryCooldown = 0;
         let irisActive = false, irisRadius = 0, irisDone = false;
         let irisTargetEntry = null;
+        let introPhase = 0, introTimer = 0, fallY = 0, fallVY = 0, cameraPan = 0, rightUpY = 0, dialogText = '';
         let mapPhase = 0;
         let tutPhase = 0;
         let target = { x: 0, y: 0, w: W * TARGET_SCALE, h: H * TARGET_SCALE };
@@ -511,7 +512,7 @@
         let scaleValue2 = 0.5, scalePhase2 = 0, scaleAnchorIdx2 = 2, scaleDir2 = 1;
         let scaleBaseOffsets2 = [];
 
-        const initScale = window.innerWidth < 500 ? 0.35 : 0.5;
+        const initScale = Math.max(0.25, Math.min(0.5, window.innerHeight / 1860));
         applyScale(initScale);
 
         const anchorImg = new Image();
@@ -1806,6 +1807,7 @@
         canvas.addEventListener('mousemove', e => {
             const rect = canvas.getBoundingClientRect();
             mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            if ('ontouchstart' in window) return;
 
             if (currentLevel === 9 && state === 'PAUSED') {
                 let near = false;
@@ -1959,6 +1961,10 @@
         function draw() {
             ctx.clearRect(0, 0, canvasW, canvasH);
 
+            if (gameState === 'INTRO') {
+                drawIntro();
+                return;
+            }
             if (gameState === 'MAP') {
                 drawMapTargets();
                 drawRect();
@@ -2497,6 +2503,21 @@
                 startLevel(irisTargetEntry.level);
                 return;
             }
+            if (gameState === 'INTRO') {
+                if (introPhase === 0) {
+                    fallVY += 1.2;
+                    fallY += fallVY;
+                    rightUpY += 1.5;
+                    if (fallY >= canvasH * 0.6) {
+                        fallY = canvasH * 0.6;
+                        introPhase = 1; introTimer = 30;
+                    }
+                } else if (introPhase === 1) {
+                    introTimer--;
+                    if (introTimer <= 0) { introPhase = 2; gameState = 'MAP'; state = 'ROTATING'; dialogText = '按住锚以切换其锚点，改变运动轨迹'; document.getElementById('info').textContent = dialogText; introTimer = 0; }
+                }
+                return;
+            }
             if (currentLevel === 9) { updateLevel9Motion(); }
             else {
                 if (currentLevel === 8 || currentLevel === 12 || currentLevel === 13) {
@@ -2630,10 +2651,10 @@
         }
 
         function loop() {
-            if (gameState === 'PLAYING' || gameState === 'MAP' ) {
+            if (gameState === 'PLAYING' || gameState === 'MAP' || gameState === 'INTRO') {
                 update();
                 draw();
-                if ((gameState === 'MAP' ) && corners2.length > 0) updateLevel8Hero2();
+                if ((gameState === 'MAP' || gameState === 'INTRO') && corners2.length > 0) updateLevel8Hero2();
             }
             requestAnimationFrame(loop);
         }
@@ -2790,6 +2811,49 @@
             }
         }
 
+        function drawIntro() {
+            const heroW = W, heroH = H;
+            const anchorX = canvasW / 2 - 200, anchorY = fallY;
+            const rightBaseY = canvasH * 0.38;
+
+            if (imgLoaded && anchorImg.width > 1) {
+                const p = [{ x: anchorX - heroW/2, y: anchorY - heroH/2 }, { x: anchorX + heroW/2, y: anchorY - heroH/2 }, { x: anchorX + heroW/2, y: anchorY + heroH/2 }, { x: anchorX - heroW/2, y: anchorY + heroH/2 }];
+                ctx.save();
+                const iw = anchorImg.width, ih = anchorImg.height;
+                const a = (p[1].x - p[0].x) / iw, b = (p[1].y - p[0].y) / iw;
+                const c = (p[3].x - p[0].x) / ih, d = (p[3].y - p[0].y) / ih;
+                ctx.setTransform(a, b, c, d, p[0].x, p[0].y);
+                ctx.drawImage(anchorImg, 0, 0, iw, ih, 0, 0, iw, ih);
+                ctx.restore();
+            }
+
+            const rightY = rightBaseY - rightUpY;
+            const rightX = anchorX + heroW / 2 + 10;
+            const alpha = Math.max(0, 1 - rightUpY / 200);
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.font = '64px "Segoe UI", sans-serif';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('的大', rightX, rightY);
+            const textW = ctx.measureText('的大').width;
+
+            if (fakeAnchorLoaded && fakeAnchorImg.width > 1) {
+                const fw = 128, fh = 128;
+                const fx = rightX + textW, fy = rightY - fh / 2;
+                ctx.drawImage(fakeAnchorImg, fx, fy, fw, fh);
+                ctx.fillText('险', fx + fw, rightY);
+            }
+            ctx.globalAlpha = 1;
+
+            if (introPhase >= 1) {
+                const infoAlpha = introPhase === 2 ? 1 : Math.max(0, (30 - introTimer) / 30);
+                ctx.fillStyle = `rgba(255,255,255,${0.7 * infoAlpha})`;
+                ctx.font = '28px "Segoe UI", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('按住锚以切换其锚点，改变运动轨迹', canvasW / 2, canvasH * 0.85);
+            }
+        }
+
         function drawMapTargets() {
             for (let i = 0; i < mapTargets.length; i++) {
                 const t = mapTargets[i];
@@ -2853,10 +2917,13 @@
 
         const titleOverlay = document.getElementById('titleOverlay');
         titleOverlay.addEventListener('click', () => {
-            console.log('title clicked');
             titleOverlay.classList.add('hidden');
-            gameState = 'MAP';
+            gameState = 'INTRO';
+            introPhase = 0; introTimer = 0;
+            fallY = canvasH * 0.38; fallVY = 0; rightUpY = 0;
+            dialogText = '';
             initMap();
+            state = 'PAUSED';
         });
 
         document.querySelectorAll('.debug-btn[data-ch]').forEach(btn => {
