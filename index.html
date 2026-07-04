@@ -364,6 +364,7 @@
             <button class="debug-btn enter-btn" data-lvl="8">L3-2</button>
             <button class="debug-btn enter-btn" data-lvl="13">L3-3</button>
             <button class="debug-btn enter-btn" data-lvl="9">L4-1</button>
+            <button class="debug-btn enter-btn" data-lvl="14">???</button>
         </div>
     </div>
     <canvas id="gameCanvas"></canvas>
@@ -404,6 +405,7 @@
             if (currentLevel === 11) { resetLevel11(); return; }
             if (currentLevel === 12) { resetLevel12(); return; }
             if (currentLevel === 13) { resetLevel13(); return; }
+            if (currentLevel === 14) { resetLevel14(); return; }
             if (currentLevel === 6) { resetLevel6(); return; }
             if (currentLevel === 7) { resetLevel7(); return; }
             if (currentLevel === 8) { resetLevel8(); return; }
@@ -452,6 +454,8 @@
                     resetLevel12();
                 } else if (currentLevel === 13) {
                     resetLevel13();
+                } else if (currentLevel === 14) {
+                    resetLevel14();
                 } else if (currentLevel === 6) {
                     resetLevel6();
                 } else if (currentLevel === 7) {
@@ -472,6 +476,7 @@
         let speedMultiplier = 1.5;
         let gameState = 'TITLE';
         let currentLevel = 3;
+        let currentChapterName = '';
         let chapterIdx = 0;
 
         const CHAPTERS = [
@@ -504,7 +509,9 @@
         let scaleBaseOffsets = [];
         let targetPaused = false;
         let targetScalePhase = 0, targetScaleDir = 1, targetScaleValue = 0.75, targetScaleAnchorIdx = 4;
-        let targetBaseAnchor = { x: 0, y: 0 }, targetScaleBaseOffsets = [];
+        let targetBaseAnchor = { x: 0, y: 0 }, targetScaleBaseOffsets = [], targetCorners = [];
+        let targetInteractive = false, targetHasDirAnchors = false, targetHasScaleAnchors = false;
+        let survivalTime = 0, bestTime = 0, survivalSpawnTimer = 0, survivalSpawnInterval = 90;
         const SCALE_SPEED = 0.02;
         const TOTAL_LEVELS = 9;
 
@@ -1017,9 +1024,14 @@
             target.w = tw; target.h = th;
             generateLevel11Traps();
             pausedTrap = -1;
+            targetInteractive = true; targetHasScaleAnchors = true; targetHasDirAnchors = false;
             targetPaused = false;
             targetScalePhase = 0; targetScaleDir = 1; targetScaleValue = 0.75; targetScaleAnchorIdx = 4;
             targetBaseAnchor = { x: target.x + target.w / 2, y: target.y + target.h / 2 };
+            targetCorners = [
+                { x: target.x, y: target.y }, { x: target.x + target.w, y: target.y },
+                { x: target.x + target.w, y: target.y + target.h }, { x: target.x, y: target.y + target.h },
+            ];
             targetScaleBaseOffsets = [
                 { x: -W * TARGET_SCALE / 2 / 0.75, y: -H * TARGET_SCALE / 2 / 0.75 },
                 { x:  W * TARGET_SCALE / 2 / 0.75, y: -H * TARGET_SCALE / 2 / 0.75 },
@@ -1409,7 +1421,7 @@
             target.y = cy - (H * TARGET_SCALE) / 2;
             target.w = W * TARGET_SCALE;
             target.h = H * TARGET_SCALE;
-
+            targetVX = 0; targetVY = 1; targetPaused = false;
             generateLevel8Traps();
             state = 'ROTATING'; state2 = 'ROTATING';
         }
@@ -1562,6 +1574,7 @@
             target.h = H * TARGET_SCALE;
             targetVX = 0; targetVY = 1;
             targetPaused = false;
+            targetInteractive = true; targetHasDirAnchors = true; targetHasScaleAnchors = false;
             state = 'ROTATING'; state2 = 'ROTATING';
         }
 
@@ -1579,31 +1592,35 @@
                 targetScalePhase += targetScaleDir * SCALE_SPEED * speedMultiplier;
                 targetScaleValue = 0.75 + 0.25 * Math.sin(targetScalePhase);
             }
-            const w0 = W * TARGET_SCALE, h0 = H * TARGET_SCALE;
-            const ba = targetScaleAnchorIdx === 4 ? targetBaseAnchor
-                : { x: targetBaseAnchor.x + targetScaleBaseOffsets[targetScaleAnchorIdx].x, y: targetBaseAnchor.y + targetScaleBaseOffsets[targetScaleAnchorIdx].y };
-            target.w = w0 * targetScaleValue;
-            target.h = h0 * targetScaleValue;
-            target.x = ba.x - target.w / 2;
-            target.y = ba.y - target.h / 2;
+            for (let i = 0; i < 4; i++) {
+                targetCorners[i] = {
+                    x: targetBaseAnchor.x + targetScaleBaseOffsets[i].x * targetScaleValue,
+                    y: targetBaseAnchor.y + targetScaleBaseOffsets[i].y * targetScaleValue,
+                };
+            }
+            target.x = targetCorners[0].x;
+            target.y = targetCorners[0].y;
+            target.w = targetCorners[1].x - targetCorners[0].x;
+            target.h = targetCorners[3].y - targetCorners[0].y;
         }
 
         function setTargetScaleAnchor(idx) {
             targetScaleAnchorIdx = idx;
             targetScaleDir *= -1;
-            const cx = target.x + target.w / 2, cy = target.y + target.h / 2;
             if (idx === 4) {
-                targetBaseAnchor = { x: cx, y: cy };
+                targetBaseAnchor = {
+                    x: (targetCorners[0].x + targetCorners[2].x) / 2,
+                    y: (targetCorners[0].y + targetCorners[2].y) / 2,
+                };
             } else {
-                targetBaseAnchor = { x: cx - targetScaleBaseOffsets[idx].x * targetScaleValue, y: cy - targetScaleBaseOffsets[idx].y * targetScaleValue };
+                targetBaseAnchor = { x: targetCorners[idx].x, y: targetCorners[idx].y };
             }
-            const w0 = W * TARGET_SCALE, h0 = H * TARGET_SCALE;
-            targetScaleBaseOffsets = [
-                { x: -w0 / 2 / 0.75, y: -h0 / 2 / 0.75 },
-                { x:  w0 / 2 / 0.75, y: -h0 / 2 / 0.75 },
-                { x:  w0 / 2 / 0.75, y:  h0 / 2 / 0.75 },
-                { x: -w0 / 2 / 0.75, y:  h0 / 2 / 0.75 },
-            ];
+            for (let i = 0; i < 4; i++) {
+                targetScaleBaseOffsets[i] = {
+                    x: (targetCorners[i].x - targetBaseAnchor.x) / Math.max(targetScaleValue, 0.01),
+                    y: (targetCorners[i].y - targetBaseAnchor.y) / Math.max(targetScaleValue, 0.01),
+                };
+            }
         }
 
         function checkLevel12Success() {
@@ -1650,7 +1667,7 @@
             target.h = H * TARGET_SCALE;
             targetVX = 0; targetVY = 1;
             targetPaused = false;
-
+            targetInteractive = true; targetHasDirAnchors = true; targetHasScaleAnchors = false;
             generateLevel13Traps();
             state = 'ROTATING'; state2 = 'ROTATING';
         }
@@ -1711,6 +1728,81 @@
 
         function resetLevel13() {
             initLevel13();
+            cooldownTimer = 0;
+        }
+
+        function initLevel14() {
+            heroMotion = 'rotate';
+            hero2Motion = 'scale';
+            const cx1 = canvasW / 2 - W * 0.7;
+            const cx2 = canvasW / 2 + W * 0.7;
+            const cy = canvasH / 2;
+            corners = [
+                { x: cx1 - W/2, y: cy - H/2 }, { x: cx1 + W/2, y: cy - H/2 },
+                { x: cx1 + W/2, y: cy + H/2 }, { x: cx1 - W/2, y: cy + H/2 },
+            ];
+            anchorIdx = 0; angle = 0;
+            anchorPos = { ...corners[anchorIdx] };
+            recomputeBaseOffsets();
+            corners2 = [
+                { x: cx2 - W/2, y: cy - H/2 }, { x: cx2 + W/2, y: cy - H/2 },
+                { x: cx2 + W/2, y: cy + H/2 }, { x: cx2 - W/2, y: cy + H/2 },
+            ];
+            scaleAnchorIdx2 = 2;
+            scaleValue2 = 0.5; scalePhase2 = 0; scaleDir2 = 1;
+            recomputeScaleOffsets2();
+            state = 'ROTATING'; state2 = 'ROTATING';
+            traps = [];
+            survivalTime = 0; survivalSpawnTimer = 0; survivalSpawnInterval = 90;
+            document.getElementById('info').textContent = '不要碰到，坚持越久越好';
+        }
+
+        function updateLevel14() {
+            survivalTime++;
+            survivalSpawnTimer++;
+            const minInterval = Math.max(20, 90 - Math.floor(survivalTime / 60));
+            if (survivalSpawnTimer >= minInterval) {
+                survivalSpawnTimer = 0;
+                const side = Math.random() > 0.5 ? 1 : -1;
+                const hw = L2_TW / 2, hh = L2_TH / 2;
+                const x = side > 0 ? -L2_TW : canvasW + L2_TW;
+                const y = L2_TH + Math.random() * (canvasH - L2_TH * 2);
+                const cos90 = 0, s = side > 0 ? 1 : -1;
+                const crn = [
+                    { x: x - hw, y: y - hh }, { x: x + hw, y: y - hh },
+                    { x: x + hw, y: y + hh }, { x: x - hw, y: y + hh },
+                ];
+                const rc = crn.map(c => ({
+                    x: x + (c.x - x) * cos90 - (c.y - y) * s,
+                    y: y + (c.x - x) * s + (c.y - y) * cos90,
+                }));
+                traps.push({ corners: rc, w: L2_TW, h: L2_TH, motion: 'static', dir: side, speed: 2 + Math.random() });
+            }
+            const toRemove = [];
+            for (let i = 0; i < traps.length; i++) {
+                const t = traps[i];
+                const sx = t.speed;
+                for (const c of t.corners) c.x += sx * t.dir;
+                if ((t.dir > 0 && t.corners[0].x > canvasW + L2_TW) || (t.dir < 0 && t.corners[0].x < -L2_TW)) toRemove.push(i);
+            }
+            for (const i of toRemove.reverse()) traps.splice(i, 1);
+            for (const t of traps) {
+                if (satOverlapPoly(corners, t.corners) >= OVERLAP_THRESHOLD || satOverlapPoly(corners2, t.corners) >= OVERLAP_THRESHOLD) {
+                    if (survivalTime > bestTime) bestTime = survivalTime;
+                    showFailure();
+                    return;
+                }
+            }
+        }
+
+        function getSurvivalTimeStr() {
+            const s = Math.floor(survivalTime / 60);
+            const ms = Math.floor((survivalTime % 60) * 100 / 60);
+            return s + '.' + (ms < 10 ? '0' : '') + ms + 's';
+        }
+
+        function resetLevel14() {
+            initLevel14();
             cooldownTimer = 0;
         }
 
@@ -1801,13 +1893,13 @@
             const pos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
             mousePos = pos;
 
-            if ((currentLevel >= 3 && currentLevel <= 7 || currentLevel >= 10 && currentLevel <= 11 || currentLevel === 8) && pausedTrap < 0 && state === 'ROTATING') {
+            if (traps.length > 0 && pausedTrap < 0 && state === 'ROTATING') {
                 for (let i = 0; i < traps.length; i++) {
                     if (traps[i].state === 'ROTATING' && pointInPolygon(pos, traps[i].corners)) {
                         mouseDown = true;
                         traps[i].state = 'PAUSED';
                         pausedTrap = i;
-                        if (currentLevel === 11) targetPaused = false;
+                        if (targetHasScaleAnchors) targetPaused = false;
                         return;
                     }
                 }
@@ -1828,16 +1920,16 @@
 
             
 
-            if ((currentLevel === 12 || currentLevel === 11 || currentLevel === 13) && pos.x >= target.x && pos.x <= target.x + target.w && pos.y >= target.y && pos.y <= target.y + target.h) {
+            if (targetInteractive && pos.x >= target.x && pos.x <= target.x + target.w && pos.y >= target.y && pos.y <= target.y + target.h) {
                 mouseDown = true;
                 targetPaused = true;
                 state = 'ROTATING';
                 if (corners2.length > 0) state2 = 'ROTATING';
-                if (currentLevel === 11 && pausedTrap >= 0) { traps[pausedTrap].state = 'ROTATING'; pausedTrap = -1; }
+                if (targetHasScaleAnchors && pausedTrap >= 0) { traps[pausedTrap].state = 'ROTATING'; pausedTrap = -1; }
                 return;
             }
 
-            if (currentLevel === 9 && pointInPolygon(pos, corners)) {
+            if (heroMotion === 'align' && pointInPolygon(pos, corners)) {
                 mouseDown = true;
                 state = 'PAUSED';
                 return;
@@ -1858,7 +1950,7 @@
             mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
             if ('ontouchstart' in window) return;
 
-            if (currentLevel === 9 && state === 'PAUSED') {
+            if (heroMotion === 'align' && state === 'PAUSED') {
                 let near = false;
                 for (const a of alignAnchors) {
                     const dx = mousePos.x - a.x, dy = mousePos.y - a.y;
@@ -1874,7 +1966,7 @@
             } else if (pausedTrap >= 0) {
                 const near = findNearTrapVertex(mousePos, traps[pausedTrap]);
                 canvas.style.cursor = near !== -1 ? 'pointer' : 'default';
-            } else if (currentLevel >= 3 && currentLevel <= 8 || currentLevel >= 10 && currentLevel <= 11) {
+            } else if (traps.length > 0) {
                 let over = pointInPolygon(mousePos, corners);
                 if (!over) {
                     for (const t of traps) {
@@ -1882,9 +1974,9 @@
                     }
                 }
                 canvas.style.cursor = over ? 'pointer' : 'default';
-            } else if (currentLevel === 8 || currentLevel === 12) {
-                canvas.style.cursor = (pointInPolygon(mousePos, corners) || pointInPolygon(mousePos, corners2) || ((currentLevel === 12 || currentLevel === 13) && mousePos.x >= target.x && mousePos.x <= target.x + target.w && mousePos.y >= target.y && mousePos.y <= target.y + target.h)) ? 'pointer' : 'default';
-            } else if (currentLevel === 9) {
+            } else if (corners2.length > 0) {
+                canvas.style.cursor = (pointInPolygon(mousePos, corners) || pointInPolygon(mousePos, corners2) || (targetInteractive && mousePos.x >= target.x && mousePos.x <= target.x + target.w && mousePos.y >= target.y && mousePos.y <= target.y + target.h)) ? 'pointer' : 'default';
+            } else if (heroMotion === 'align') {
                 canvas.style.cursor = pointInPolygon(mousePos, corners) ? 'pointer' : 'default';
             } else {
                 canvas.style.cursor = pointInPolygon(mousePos, corners) ? 'pointer' : 'default';
@@ -1911,7 +2003,7 @@
                 const near = findNearVertex2(pos);
                 if (near !== -1) setScaleAnchor2(near);
                 state2 = 'ROTATING';
-            } else if (currentLevel === 9 && state === 'PAUSED') {
+            } else if (heroMotion === 'align' && state === 'PAUSED') {
                 for (const a of alignAnchors) {
                     const dx = pos.x - a.x, dy = pos.y - a.y;
                     if (dx * dx + dy * dy < VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS) {
@@ -1922,7 +2014,7 @@
                     }
                 }
                 state = 'ROTATING';
-            } else if (currentLevel === 11 && targetPaused) {
+            } else if (targetHasScaleAnchors && targetPaused) {
                 const tcx = target.x + target.w / 2, tcy = target.y + target.h / 2;
                 const pts = [
                     { x: tcx - target.w / 2, y: tcy - target.h / 2 },
@@ -1936,7 +2028,7 @@
                     if (dx * dx + dy * dy < VERTEX_HIT_RADIUS * VERTEX_HIT_RADIUS) { setTargetScaleAnchor(i); break; }
                 }
                 targetPaused = false;
-            } else if (currentLevel === 12 && targetPaused) {
+            } else if (targetHasDirAnchors && targetPaused) {
                 const tcx = target.x + target.w / 2, tcy = target.y + target.h / 2;
                 const dx = pos.x - tcx, dy = pos.y - tcy;
                 if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
@@ -2032,6 +2124,16 @@
         function draw() {
             ctx.clearRect(0, 0, canvasW, canvasH);
 
+            if (currentLevel === 14) {
+                drawStoneTraps();
+                drawRect();
+                drawHero2();
+                drawFloatingTexts();
+                if (state === 'PAUSED') drawVertices();
+                else if (state2 === 'PAUSED') drawVertices2();
+                drawSurvivalUI();
+                return;
+            }
             if (gameState === 'INTRO') {
                 drawIntro();
                 return;
@@ -2047,19 +2149,26 @@
                 return;
             }
             
-            if (currentLevel === 9) drawLevel9();
-            else if (currentLevel === 3 || currentLevel === 6 || currentLevel === 10) { drawTarget(); drawLevel3Traps(); }
-            else if (currentLevel === 4) { drawTarget(); drawLevel4Traps(); }
-            else if (currentLevel === 7) { drawTarget(); drawLevel4Traps(); }
-            else if (currentLevel === 11) { drawTarget(); drawLevel4Traps(); if (targetPaused) drawTargetScaleAnchors(); }
-            else if (currentLevel === 8) { drawTarget(); drawLevel8Traps(); }
-            else if (currentLevel === 13) { drawTarget(); drawStoneTraps(); }
-            else drawTarget();
-            if (currentLevel !== 9) drawRect();
+            if (heroMotion === 'align') drawLevel9();
+            else {
+                drawTarget();
+                if (traps.length > 0) {
+                    if (traps[0].motion === 'static') drawStoneTraps();
+                    else drawLevel4Traps();
+                }
+                if (targetHasScaleAnchors && targetPaused) drawTargetScaleAnchors();
+            }
+            if (heroMotion !== 'align') drawRect();
             if (corners2.length > 0) drawHero2();
-            if (currentLevel === 12 && targetPaused) drawTargetDirAnchors();
+            if (targetHasDirAnchors && targetPaused) drawTargetDirAnchors();
+            if (currentChapterName) {
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.font = '18px "Segoe UI", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(currentChapterName, canvasW / 2, 30);
+            }
             drawFloatingTexts();
-            if (state === 'PAUSED' && currentLevel !== 9) drawVertices();
+            if (state === 'PAUSED' && heroMotion !== 'align') drawVertices();
             else if (state2 === 'PAUSED') drawVertices2();
             else if (pausedTrap >= 0) drawTrapVertices(traps[pausedTrap]);
 
@@ -2345,8 +2454,8 @@
                 const isAnchor = i === targetScaleAnchorIdx;
                 const r = i === 4 ? 7 : (hovered ? 9 : 6);
                 ctx.beginPath(); ctx.arc(pts[i].x, pts[i].y, r, 0, Math.PI * 2);
-                if (isAnchor) { ctx.fillStyle = '#ff9f43'; ctx.strokeStyle = '#ee5a24'; ctx.lineWidth = 2.5; }
-                else { ctx.fillStyle = hovered ? '#feca57' : (i === 4 ? 'rgba(255,255,255,0.3)' : '#ffc048'); ctx.strokeStyle = i === 4 ? 'rgba(255,255,255,0.3)' : '#e1a020'; ctx.lineWidth = 2; }
+                if (isAnchor) { ctx.fillStyle = '#ff6b6b'; ctx.strokeStyle = '#ff4444'; ctx.lineWidth = 2.5; }
+                else { ctx.fillStyle = hovered ? '#5dfcd1' : (i === 4 ? 'rgba(255,255,255,0.2)' : '#4ecdc4'); ctx.strokeStyle = i === 4 ? 'rgba(255,255,255,0.2)' : '#3db8a8'; ctx.lineWidth = 2; }
                 ctx.fill(); ctx.stroke();
             }
         }
@@ -2439,6 +2548,20 @@
                 } else {
                     drawTrapWarpedStone(t.corners);
                 }
+            }
+        }
+
+        function drawSurvivalUI() {
+            const ts = getSurvivalTimeStr();
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.font = 'bold 24px \"Segoe UI\", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(ts, canvasW / 2, 30);
+            if (bestTime > 0) {
+                ctx.font = '14px \"Segoe UI\", sans-serif';
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                const bs = Math.floor(bestTime / 60) + '.' + (Math.floor((bestTime % 60) * 100 / 60) < 10 ? '0' : '') + Math.floor((bestTime % 60) * 100 / 60) + 's';
+                ctx.fillText('最佳: ' + bs, canvasW / 2, 54);
             }
         }
 
@@ -2586,6 +2709,7 @@
         /* ── Loop ── */
 
         function update() {
+            if (currentLevel === 14) { updateLevel14(); return; }
             if (irisActive) {
                 irisRadius = Math.max(0, irisRadius - Math.max(canvasW, canvasH) * 0.017);
                 if (irisRadius <= 0) { irisRadius = 0; irisDone = true; irisActive = false; }
@@ -2618,9 +2742,9 @@
                 }
                 return;
             }
-            if (currentLevel === 9) { updateLevel9Motion(); }
+            if (heroMotion === 'align') { updateLevel9Motion(); }
             else {
-                if (currentLevel === 8 || currentLevel === 12 || currentLevel === 13) {
+                if (corners2.length > 0) {
                 if (state === 'ROTATING') angle += ROTATION_SPEED * speedMultiplier;
                 updateCorners();
                 if (state2) updateLevel8Hero2();
@@ -2637,12 +2761,24 @@
                 updateCorners();
             }
 
-            if (currentLevel === 3 || currentLevel === 4 || currentLevel === 10) updateAllTraps();
-            else if (currentLevel === 6) updateLevel6Traps();
-            else if (currentLevel === 7) updateLevel7Traps();
-            else if (currentLevel === 11) { updateLevel7Traps(); updateLevel11Target(); }
-            else if (currentLevel === 8) { updateLevel8Traps(); updateLevel12Target(); }
-            else if (currentLevel === 12 || currentLevel === 13) updateLevel12Target();
+            for (const t of traps) {
+                if (t.state !== 'ROTATING') continue;
+                if (t.motion === 'scale' && t.scalePhase !== undefined) {
+                    t.scalePhase += t.scaleDir * SCALE_SPEED * speedMultiplier;
+                    t.scaleValue = 0.75 + 0.25 * Math.sin(t.scalePhase);
+                    for (let i = 0; i < 4; i++) {
+                        t.corners[i] = { x: t.baseAnchor.x + t.scaleBaseOffsets[i].x * t.scaleValue, y: t.baseAnchor.y + t.scaleBaseOffsets[i].y * t.scaleValue };
+                    }
+                } else if (t.motion === 'rotate') {
+                    if (t.anchorIdx !== undefined) {
+                        if (t.speed) t.angle += t.speed * speedMultiplier;
+                        updateTrapCorners(t);
+                    }
+                }
+            }
+            if (targetHasScaleAnchors) updateLevel11Target();
+            if (targetHasDirAnchors) updateLevel12Target();
+            if (currentLevel === 8) updateLevel8Traps();
             }
 
             if (state === 'ROTATING' && cooldownTimer <= 0) {
@@ -2844,8 +2980,13 @@
 
         function showFailure() {
             gameState = 'VICTORY';
-            resultText.textContent = FAILURE_TEXTS[Math.floor(Math.random() * FAILURE_TEXTS.length)] + '!';
-            resultText.style.color = '#ff4444';
+            if (currentLevel === 14) {
+                resultText.textContent = '坚持了 ' + getSurvivalTimeStr();
+                resultText.style.color = '#f0a500';
+            } else {
+                resultText.textContent = FAILURE_TEXTS[Math.floor(Math.random() * FAILURE_TEXTS.length)] + '!';
+                resultText.style.color = '#ff4444';
+            }
             resultBtn.textContent = '重试';
             resultBtn.onclick = () => {
                 resultOverlay.classList.add('hidden');
@@ -3073,6 +3214,8 @@
 
         function startLevel(level) {
             currentLevel = level;
+            const ch = CHAPTERS.find(c => c.level === level);
+            currentChapterName = ch ? ch.id : '';
             gameState = 'PLAYING';
             score = 0;
             floatingTexts = [];
@@ -3089,6 +3232,7 @@
             else if (level === 11) initLevel11();
             else if (level === 12) initLevel12();
             else if (level === 13) initLevel13();
+            else if (level === 14) initLevel14();
             else if (level === 6) initLevel6();
             else if (level === 7) initLevel7();
             else if (level === 8) initLevel8();
