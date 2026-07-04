@@ -500,6 +500,7 @@
         let irisActive = false, irisRadius = 0, irisDone = false;
         let irisTargetEntry = null;
         let shiftX = 0, shiftY = 0, mysteryAnchor = false;
+        let colOffsets = [0,0,0], rowOffsets = [0,0,0];
         let introPhase = 0, introTimer = 0, fallY = 0, fallVY = 0, cameraPan = 0, dialogText = '', fadeAlpha = 0;
         let mapPhase = 0;
         let tutPhase = 0;
@@ -2019,14 +2020,62 @@
                 const tcx = canvasW / 2, tcy = canvasH / 2;
                 const dx = pos.x - tcx, dy = pos.y - tcy;
                 if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
-                    const step = W * 1.6;
-                    if (Math.abs(dx) > Math.abs(dy)) shiftX += dx > 0 ? step : -step;
-                    else shiftY += dy > 0 ? step : -step;
-                    for (const t of mapTargets) {
-                        if (t.cx + shiftX - t.w/2 < 0) shiftX = -(t.cx - t.w/2);
-                        if (t.cx + shiftX + t.w/2 > canvasW) shiftX = canvasW - (t.cx + t.w/2);
-                        if (t.cy + shiftY - t.h/2 < 0) shiftY = -(t.cy - t.h/2);
-                        if (t.cy + shiftY + t.h/2 > canvasH) shiftY = canvasH - (t.cy + t.h/2);
+                    const margin = 10;
+                    const grid = mapTargets.filter(t => t.col >= 0 && t.col < 3 && t.row >= 0 && t.row < 3);
+                    let dir;
+                    if (Math.abs(dx) > Math.abs(dy)) dir = dx > 0 ? 'right' : 'left';
+                    else dir = dy > 0 ? 'down' : 'up';
+
+                    if (dir === 'left') {
+                        const col0 = grid.filter(t => t.col === 0).map(t => ({cx: t.cx, cy: t.cy, w: t.w}));
+                        colOffsets = [0,0,0]; rowOffsets = [0,0,0]; shiftY = 0;
+                        colOffsets[0] = margin - (col0[0].cx - col0[0].w/2);
+                        for (let c = 1; c < 3; c++) {
+                            const prev = grid.filter(t => t.col === c-1);
+                            const cur = grid.filter(t => t.col === c);
+                            if (prev.length && cur.length) {
+                                colOffsets[c] = (prev[0].cx + colOffsets[c-1] + prev[0].w/2 + 8) - (cur[0].cx - cur[0].w/2);
+                            }
+                        }
+                        shiftX = colOffsets[0];
+                        const heroT = grid.find(t => t.col === 0);
+                        if (heroT) moveHeroesTo(heroT.cx + colOffsets[0], heroT.cy + rowOffsets[heroT.row] + shiftY);
+                    } else if (dir === 'right') {
+                        const col2 = grid.filter(t => t.col === 2).map(t => ({cx: t.cx, w: t.w}));
+                        const col1 = grid.filter(t => t.col === 1).map(t => ({cx: t.cx, w: t.w}));
+                        const col0 = grid.filter(t => t.col === 0).map(t => ({cx: t.cx, w: t.w}));
+                        colOffsets = [0,0,0]; rowOffsets = [0,0,0]; shiftY = 0;
+                        colOffsets[2] = canvasW - margin - (col2[0].cx + col2[0].w/2);
+                        colOffsets[1] = (col2[0].cx + colOffsets[2] - col2[0].w/2 - 8) - (col1[0].cx + col1[0].w/2);
+                        colOffsets[0] = (col1[0].cx + colOffsets[1] - col1[0].w/2 - 8) - (col0[0].cx + col0[0].w/2);
+                        shiftX = colOffsets[0];
+                        const heroT = grid.find(t => t.col === 2);
+                        if (heroT) moveHeroesTo(heroT.cx + colOffsets[2], heroT.cy + rowOffsets[heroT.row] + shiftY);
+                    } else if (dir === 'up') {
+                        const row0 = grid.filter(t => t.row === 0).map(t => ({cy: t.cy, h: t.h}));
+                        colOffsets = [0,0,0]; rowOffsets = [0,0,0]; shiftX = 0;
+                        rowOffsets[0] = margin - (row0[0].cy - row0[0].h/2);
+                        for (let r = 1; r < 3; r++) {
+                            const prev = grid.filter(t => t.row === r-1);
+                            const cur = grid.filter(t => t.row === r);
+                            if (prev.length && cur.length) {
+                                rowOffsets[r] = (prev[0].cy + rowOffsets[r-1] + prev[0].h/2 + 8) - (cur[0].cy - cur[0].h/2);
+                            }
+                        }
+                        shiftY = rowOffsets[0];
+                        const heroT = grid.find(t => t.row === 0);
+                        if (heroT) moveHeroesTo(heroT.cx + colOffsets[heroT.col] + shiftX, heroT.cy + rowOffsets[0]);
+                    } else {
+                        const row2 = grid.filter(t => t.row === 2).map(t => ({cy: t.cy, h: t.h}));
+                        const row1 = grid.filter(t => t.row === 1).map(t => ({cy: t.cy, h: t.h}));
+                        const row0 = grid.filter(t => t.row === 0).map(t => ({cy: t.cy, h: t.h}));
+                        colOffsets = [0,0,0]; rowOffsets = [0,0,0]; shiftX = 0;
+                        rowOffsets[2] = canvasH - margin - (row2[0].cy + row2[0].h/2);
+                        rowOffsets[1] = (row2[0].cy + rowOffsets[2] - row2[0].h/2 - 8) - (row1[0].cy + row1[0].h/2);
+                        rowOffsets[0] = (row1[0].cy + rowOffsets[1] - row1[0].h/2 - 8) - (row0[0].cy + row0[0].h/2);
+                        shiftY = rowOffsets[0];
+                        const heroT = grid.find(t => t.row === 2);
+                        if (heroT) moveHeroesTo(heroT.cx + colOffsets[heroT.col] + shiftX, heroT.cy + rowOffsets[2]);
                     }
                 }
                 mysteryAnchor = false;
@@ -2773,8 +2822,8 @@
                 updateLevel8Hero2();
                 for (const t of mapTargets) {
                     if (t.id !== '???' || t.status !== 'unlocked') continue;
-                    target.x = t.cx + shiftX - t.w/2;
-                    target.y = t.cy + shiftY - t.h/2;
+                    target.x = t.cx + (t.col >= 0 ? colOffsets[t.col] : 0) + shiftX - t.w/2;
+                    target.y = t.cy + (t.row >= 0 ? rowOffsets[t.row] : 0) + shiftY - t.h/2;
                     target.w = t.w; target.h = t.h;
                     let ok1 = true, ok2 = true;
                     for (const c of corners) if (c.x < target.x || c.x > target.x + target.w || c.y < target.y || c.y > target.y + target.h) ok1 = false;
@@ -2787,8 +2836,8 @@
                 if (introPhase === 0) {
                     cameraPan += 12;
                     fallY += 0.2;
-                    if (canvasH + W * 1.6 - cameraPan <= canvasH * 0.2) {
-                        cameraPan = canvasH + W * 1.6 - canvasH * 0.2;
+                    if (canvasH + W * 1.6 - cameraPan <= canvasH * 0.18) {
+                        cameraPan = canvasH + W * 1.6 - canvasH * 0.18;
                         introPhase = 1; fallVY = 5;
                     }
                 } else if (introPhase === 1) {
@@ -2800,6 +2849,8 @@
                         introPhase = 3; gameState = 'MAP'; state = 'ROTATING';
                         dialogText = '按住锚以切换其锚点，改变运动轨迹，进入目标点';
                         document.getElementById('info').textContent = dialogText;
+                        document.getElementById('info').style.transform = '';
+                        document.getElementById('info').style.opacity = '';
                         initMap();
                     }
                 }
@@ -3170,14 +3221,6 @@
                 }
             }
 
-            if (introPhase >= 2) fadeAlpha = Math.min(1, fadeAlpha + 0.033);
-            const alpha = introPhase === 3 ? 1 : fadeAlpha;
-            if (alpha > 0) {
-                ctx.fillStyle = `rgba(255,255,255,${0.7 * alpha})`;
-                ctx.font = '28px "Segoe UI", sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('\u6309\u4f4f\u951a\u4ee5\u5207\u6362\u5176\u951a\u70b9\uff0c\u6539\u53d8\u8fd0\u52a8\u8f68\u8ff9', canvasW / 2, canvasH * 0.85);
-            }
         }
 
         function drawMapTargets() {
@@ -3268,50 +3311,53 @@
             scaleValue2 = 0.5; scalePhase2 = 0; scaleDir2 = 1;
             recomputeScaleOffsets2();
             state = 'ROTATING'; state2 = 'ROTATING';
-            shiftX = 0; shiftY = 0; mysteryAnchor = false;
+            colOffsets = [0,0,0]; rowOffsets = [0,0,0]; mysteryAnchor = false;
+            const uniqueX = [...new Set(mapTargets.filter(t => t.id !== '???').map(t => t.cx))].sort((a,b)=>a-b);
+            const uniqueY = [...new Set(mapTargets.filter(t => t.id !== '???').map(t => t.cy))].sort((a,b)=>a-b);
+            for (const t of mapTargets) { t.col = uniqueX.indexOf(t.cx); t.row = uniqueY.indexOf(t.cy); }
             backBtn.classList.remove('hidden');
         }
-
         function drawMystery() {
-            for (let i = 0; i < mapTargets.length; i++) {
-                const t = mapTargets[i];
-                const tx = t.cx + shiftX, ty = t.cy + shiftY;
+            const sorted = [...mapTargets].sort((a,b) => a.row !== b.row ? a.row - b.row : a.col - b.col);
+            for (let i = 0; i < sorted.length; i++) {
+                const t = sorted[i];
+                const tx = t.cx + (t.col >= 0 ? colOffsets[t.col] : 0) + shiftX;
+                const ty = t.cy + (t.row >= 0 ? rowOffsets[t.row] : 0) + shiftY;
                 if (tx + t.w/2 < 0 || tx - t.w/2 > canvasW || ty + t.h/2 < 0 || ty - t.h/2 > canvasH) continue;
-                if (i > 0) {
-                    const prev = mapTargets[i-1];
-                    const px = prev.cx + shiftX, py = prev.cy + shiftY;
-                    ctx.beginPath();
-                    ctx.moveTo(px, py);
-                    ctx.lineTo(tx, ty);
-                    ctx.strokeStyle = t.status === 'completed' ? 'rgba(240,165,0,0.3)' : 'rgba(255,255,255,0.1)';
-                    ctx.lineWidth = 1.5;
-                    ctx.setLineDash([4, 4]);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
+                if (i > 0 && sorted[i-1].row === t.row) {
+                    const prev = sorted[i-1];
+                    const px = prev.cx + colOffsets[prev.col] + shiftX, py = prev.cy + rowOffsets[prev.row] + shiftY;
+                    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(tx, ty);
+                    ctx.strokeStyle = t.status === "completed" ? "rgba(240,165,0,0.3)" : "rgba(255,255,255,0.1)";
+                    ctx.lineWidth = 1.5; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
                 }
-                ctx.beginPath();
-                ctx.rect(tx - t.w/2, ty - t.h/2, t.w, t.h);
-                if (t.status === 'completed') { ctx.fillStyle = 'rgba(240,165,0,0.2)'; ctx.fill(); }
-                ctx.strokeStyle = t.status === 'completed' ? '#f0a500' : (t.id === '???' ? 'rgba(240,165,0,0.6)' : 'rgba(240,165,0,0.4)');
-                ctx.lineWidth = 2;
-                ctx.setLineDash(t.status === 'completed' ? [] : [6, 3]);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.fillStyle = t.status === 'completed' ? '#f0a500' : 'rgba(255,255,255,0.5)';
-                ctx.font = 'bold ' + MAP_FONT + 'px \"Segoe UI\", sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(t.id, tx, ty);
-                ctx.textBaseline = 'alphabetic';
+                ctx.beginPath(); ctx.rect(tx - t.w/2, ty - t.h/2, t.w, t.h);
+                if (t.status === "completed") { ctx.fillStyle = "rgba(240,165,0,0.2)"; ctx.fill(); }
+                ctx.strokeStyle = t.status === "completed" ? "#f0a500" : "rgba(240,165,0,0.4)";
+                ctx.lineWidth = 2; ctx.setLineDash(t.status === "completed" ? [] : [6,3]); ctx.stroke(); ctx.setLineDash([]);
+                ctx.fillStyle = t.status === "completed" ? "#f0a500" : "rgba(255,255,255,0.5)";
+                ctx.font = 'bold 64px \"Segoe UI\", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(t.id, tx, ty); ctx.textBaseline = 'alphabetic';
             }
-            const orig1 = corners.map(c => ({...c}));
-            const orig2 = corners2.map(c => ({...c}));
-            for (const c of corners) { c.x += shiftX; c.y += shiftY; }
-            for (const c of corners2) { c.x += shiftX; c.y += shiftY; }
-            drawRect();
-            drawHero2();
+            const orig1 = corners.map(c => ({...c})), orig2 = corners2.map(c => ({...c}));
+            drawRect(); drawHero2();
             for (let i = 0; i < 4; i++) { corners[i] = orig1[i]; corners2[i] = orig2[i]; }
             if (mysteryAnchor) drawMysteryAnchors();
+        }
+
+        function moveHeroesTo(gx, gy) {
+            corners = [
+                { x: gx - W/2, y: gy - H/2 }, { x: gx + W/2, y: gy - H/2 },
+                { x: gx + W/2, y: gy + H/2 }, { x: gx - W/2, y: gy + H/2 },
+            ];
+            anchorIdx = 4; angle = 0;
+            anchorPos = { x: gx, y: gy };
+            recomputeBaseOffsets();
+            corners2 = [
+                { x: gx - W/2, y: gy - H/2 }, { x: gx + W/2, y: gy - H/2 },
+                { x: gx + W/2, y: gy + H/2 }, { x: gx - W/2, y: gy + H/2 },
+            ];
+            recomputeScaleOffsets2();
         }
 
         function drawMysteryAnchors() {
@@ -3340,6 +3386,8 @@
             dialogText = '';
             initMap();
             document.getElementById('info').textContent = '';
+            document.getElementById('info').style.transform = '';
+            document.getElementById('info').style.opacity = '';
             state = 'PAUSED';
         });
 
