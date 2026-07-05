@@ -500,8 +500,8 @@
         let irisActive = false, irisRadius = 0, irisDone = false;
         let irisTargetEntry = null;
         let shiftX = 0, shiftY = 0, mysteryAnchor = false;
+        let colOffsets = [0,0,0,0], rowOffsets = [0,0,0];
         let mysteryAnchorX = 0, mysteryAnchorY = 0;
-        let colOffsets = [0,0,0], rowOffsets = [0,0,0];
         let introPhase = 0, introTimer = 0, fallY = 0, fallVY = 0, cameraPan = 0, dialogText = '', fadeAlpha = 0;
         let mapPhase = 0;
         let tutPhase = 0;
@@ -1814,6 +1814,13 @@
             return s + '.' + (ms < 10 ? '0' : '') + ms + 's';
         }
 
+        function getBestTimeStr() {
+            if (bestTime <= 0) return '--';
+            const s = Math.floor(bestTime / 60);
+            const ms = Math.floor((bestTime % 60) * 100 / 60);
+            return s + '.' + (ms < 10 ? '0' : '') + ms + 's';
+        }
+
         function resetLevel14() {
             initLevel14();
             cooldownTimer = 0;
@@ -2023,63 +2030,59 @@
                 const tcx = mysteryAnchorX, tcy = mysteryAnchorY;
                 const dx = pos.x - tcx, dy = pos.y - tcy;
                 if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
-                    const margin = 10;
-                    const grid = mapTargets.filter(t => t.col >= 0 && t.col < 3 && t.row >= 0 && t.row < 3);
+                    const margin = 10, gap = 8;
+                    const grid = mapTargets.filter(t => t.col >= 0 && t.row >= 0);
                     let dir;
                     if (Math.abs(dx) > Math.abs(dy)) dir = dx > 0 ? 'right' : 'left';
                     else dir = dy > 0 ? 'down' : 'up';
 
-                    if (dir === 'left') {
-                        const col0 = grid.filter(t => t.col === 0).map(t => ({cx: t.cx, cy: t.cy, w: t.w}));
-                        colOffsets = [0,0,0]; rowOffsets = [0,0,0]; shiftY = 0;
-                        colOffsets[0] = margin - (col0[0].cx - col0[0].w/2);
-                        for (let c = 1; c < 3; c++) {
-                            const prev = grid.filter(t => t.col === c-1);
-                            const cur = grid.filter(t => t.col === c);
-                            if (prev.length && cur.length) {
-                                colOffsets[c] = (prev[0].cx + colOffsets[c-1] + prev[0].w/2 + 8) - (cur[0].cx - cur[0].w/2);
-                            }
-                        }
-                        shiftX = colOffsets[0];
-                        const heroT = grid.find(t => t.col === 0);
-                        if (heroT) moveHeroesTo(heroT.cx + colOffsets[0], heroT.cy + rowOffsets[heroT.row] + shiftY);
-                    } else if (dir === 'right') {
-                        const col2 = grid.filter(t => t.col === 2).map(t => ({cx: t.cx, w: t.w}));
-                        const col1 = grid.filter(t => t.col === 1).map(t => ({cx: t.cx, w: t.w}));
-                        const col0 = grid.filter(t => t.col === 0).map(t => ({cx: t.cx, w: t.w}));
-                        colOffsets = [0,0,0]; rowOffsets = [0,0,0]; shiftY = 0;
-                        colOffsets[2] = canvasW - margin - (col2[0].cx + col2[0].w/2);
-                        colOffsets[1] = (col2[0].cx + colOffsets[2] - col2[0].w/2 - 8) - (col1[0].cx + col1[0].w/2);
-                        colOffsets[0] = (col1[0].cx + colOffsets[1] - col1[0].w/2 - 8) - (col0[0].cx + col0[0].w/2);
-                        shiftX = colOffsets[0];
-                        const heroT = grid.find(t => t.col === 2);
-                        if (heroT) moveHeroesTo(heroT.cx + colOffsets[2], heroT.cy + rowOffsets[heroT.row] + shiftY);
-                    } else if (dir === 'up') {
-                        const row0 = grid.filter(t => t.row === 0).map(t => ({cy: t.cy, h: t.h}));
-                        colOffsets = [0,0,0]; rowOffsets = [0,0,0]; shiftX = 0;
-                        rowOffsets[0] = margin - (row0[0].cy - row0[0].h/2);
-                        for (let r = 1; r < 3; r++) {
-                            const prev = grid.filter(t => t.row === r-1);
-                            const cur = grid.filter(t => t.row === r);
-                            if (prev.length && cur.length) {
-                                rowOffsets[r] = (prev[0].cy + rowOffsets[r-1] + prev[0].h/2 + 8) - (cur[0].cy - cur[0].h/2);
-                            }
-                        }
-                        shiftY = rowOffsets[0];
-                        const heroT = grid.find(t => t.row === 0);
-                        if (heroT) moveHeroesTo(heroT.cx + colOffsets[heroT.col] + shiftX, heroT.cy + rowOffsets[0]);
-                    } else {
-                        const row2 = grid.filter(t => t.row === 2).map(t => ({cy: t.cy, h: t.h}));
-                        const row1 = grid.filter(t => t.row === 1).map(t => ({cy: t.cy, h: t.h}));
-                        const row0 = grid.filter(t => t.row === 0).map(t => ({cy: t.cy, h: t.h}));
-                        colOffsets = [0,0,0]; rowOffsets = [0,0,0]; shiftX = 0;
-                        rowOffsets[2] = canvasH - margin - (row2[0].cy + row2[0].h/2);
-                        rowOffsets[1] = (row2[0].cy + rowOffsets[2] - row2[0].h/2 - 8) - (row1[0].cy + row1[0].h/2);
-                        rowOffsets[0] = (row1[0].cy + rowOffsets[1] - row1[0].h/2 - 8) - (row0[0].cy + row0[0].h/2);
-                        shiftY = rowOffsets[0];
-                        const heroT = grid.find(t => t.row === 2);
-                        if (heroT) moveHeroesTo(heroT.cx + colOffsets[heroT.col] + shiftX, heroT.cy + rowOffsets[2]);
+                    const colT = [grid.find(t => t.col === 0), grid.find(t => t.col === 1), grid.find(t => t.col === 2), grid.find(t => t.col === 3)];
+                    const rowT = [grid.find(t => t.row === 0), grid.find(t => t.row === 1), grid.find(t => t.row === 2)];
+
+                    const hcx = (corners[0].x + corners[2].x) / 2;
+                    const hcy = (corners[0].y + corners[2].y) / 2;
+                    let heroCol = 1, heroRow = 1;
+                    for (const t of grid) {
+                        const tx = t.cx + colOffsets[t.col], ty = t.cy + rowOffsets[t.row];
+                        if (Math.abs(hcx - tx) < t.w && Math.abs(hcy - ty) < t.h) { heroCol = t.col; heroRow = t.row; break; }
                     }
+
+                    if (dir === 'left') {
+                        for (let c = 0; c < 4; c++) {
+                            const t = colT[c]; if (!t) continue;
+                            const curLeft = t.cx - t.w / 2 + colOffsets[c];
+                            const targetLeft = c === 0 ? margin : (colT[c-1].cx + colOffsets[c-1] + colT[c-1].w / 2 + gap);
+                            colOffsets[c] += targetLeft - curLeft;
+                        }
+                    } else if (dir === 'right') {
+                        for (let c = 3; c >= 0; c--) {
+                            const t = colT[c]; if (!t) continue;
+                            const curRight = t.cx + t.w / 2 + colOffsets[c];
+                            const targetRight = c === 3 ? canvasW - margin : (colT[c+1].cx + colOffsets[c+1] - colT[c+1].w / 2 - gap);
+                            colOffsets[c] += targetRight - curRight;
+                        }
+                    } else if (dir === 'up') {
+                        for (let r = 0; r < 3; r++) {
+                            const t = rowT[r]; if (!t) continue;
+                            const curTop = t.cy - t.h / 2 + rowOffsets[r];
+                            const targetTop = r === 0 ? margin : (rowT[r-1].cy + rowOffsets[r-1] + rowT[r-1].h / 2 + gap);
+                            rowOffsets[r] += targetTop - curTop;
+                        }
+                    } else {
+                        for (let r = 2; r >= 0; r--) {
+                            const t = rowT[r]; if (!t) continue;
+                            const curBottom = t.cy + t.h / 2 + rowOffsets[r];
+                            const targetBottom = r === 2 ? canvasH - margin : (rowT[r+1].cy + rowOffsets[r+1] - rowT[r+1].h / 2 - gap);
+                            rowOffsets[r] += targetBottom - curBottom;
+                        }
+                    }
+
+                    if (dir === 'left') heroCol = 0;
+                    else if (dir === 'right') heroCol = 3;
+                    else if (dir === 'up') heroRow = 0;
+                    else if (dir === 'down') heroRow = 2;
+                    const targetT = grid.find(t => t.col === heroCol && t.row === heroRow);
+                    if (targetT) moveHeroesTo(targetT.cx + colOffsets[heroCol], targetT.cy + rowOffsets[heroRow]);
                 }
                 mysteryAnchor = false;
                 return;
@@ -2825,8 +2828,8 @@
                 updateLevel8Hero2();
                 for (const t of mapTargets) {
                     if (t.id !== '???' || t.status !== 'unlocked') continue;
-                    target.x = t.cx + (t.col >= 0 ? colOffsets[t.col] : 0) + shiftX - t.w/2;
-                    target.y = t.cy + (t.row >= 0 ? rowOffsets[t.row] : 0) + shiftY - t.h/2;
+                    target.x = t.cx + colOffsets[t.col] - t.w/2;
+                    target.y = t.cy + rowOffsets[t.row] - t.h/2;
                     target.w = t.w; target.h = t.h;
                     let ok1 = true, ok2 = true;
                     for (const c of corners) if (c.x < target.x || c.x > target.x + target.w || c.y < target.y || c.y > target.y + target.h) ok1 = false;
@@ -2839,8 +2842,8 @@
                 if (introPhase === 0) {
                     cameraPan += 12;
                     fallY += 0.2;
-                    if (canvasH + W * 1.6 - cameraPan <= canvasH * 0.18) {
-                        cameraPan = canvasH + W * 1.6 - canvasH * 0.18;
+                    if (canvasH + W * 1.6 - cameraPan <= canvasH * 0.16) {
+                        cameraPan = canvasH + W * 1.6 - canvasH * 0.16;
                         introPhase = 1; fallVY = 5;
                     }
                 } else if (introPhase === 1) {
@@ -3102,9 +3105,16 @@
 
         function showFailure() {
             if (currentLevel === 14) {
-                gameState = 'MYSTERY';
+                gameState = 'VICTORY';
                 if (survivalTime > bestTime) bestTime = survivalTime;
-                initMystery();
+                resultText.textContent = '坚持了 ' + getSurvivalTimeStr() + '，最高 ' + getBestTimeStr() + '!';
+                resultText.style.color = '#ff4444';
+                resultBtn.textContent = '重试';
+                resultBtn.onclick = () => {
+                    resultOverlay.classList.add('hidden');
+                    startLevel(14);
+                };
+                resultOverlay.classList.remove('hidden');
                 return;
             }
             gameState = 'VICTORY';
@@ -3133,7 +3143,7 @@
             const positions = [];
             for (let row = 0; row < 3; row++) {
                 for (let col = 0; col < 3; col++) {
-                    positions.push({ x: canvasW * (0.2 + col * 0.33), y: canvasH * (0.18 + row * 0.32) });
+                    positions.push({ x: canvasW * (0.2 + col * 0.33), y: canvasH * (0.16 + row * 0.32) });
                 }
             }
             [positions[3], positions[5]] = [positions[5], positions[3]];
@@ -3293,9 +3303,10 @@
             hero2Motion = 'scale';
             initMap();
             mapTargets.push({
-                cx: canvasW + 80, cy: canvasH * 0.2,
+                cx: canvasW + 80, cy: canvasH * 0.86,
                 w: W * 1.6, h: H * 1.6,
                 status: 'unlocked', id: '???', level: 14, idx: mapTargets.length,
+                col: 3, row: 2,
             });
             const t3 = mapTargets.find(t => t.id === '3-3');
             const cx = t3 ? t3.cx : canvasW * 0.8;
@@ -3315,22 +3326,22 @@
             scaleValue2 = 0.5; scalePhase2 = 0; scaleDir2 = 1;
             recomputeScaleOffsets2();
             state = 'ROTATING'; state2 = 'ROTATING';
-            colOffsets = [0,0,0]; rowOffsets = [0,0,0]; mysteryAnchor = false;
+            colOffsets = [0,0,0,0]; rowOffsets = [0,0,0]; mysteryAnchor = false;
             const uniqueX = [...new Set(mapTargets.filter(t => t.id !== '???').map(t => t.cx))].sort((a,b)=>a-b);
             const uniqueY = [...new Set(mapTargets.filter(t => t.id !== '???').map(t => t.cy))].sort((a,b)=>a-b);
-            for (const t of mapTargets) { t.col = uniqueX.indexOf(t.cx); t.row = uniqueY.indexOf(t.cy); }
+            for (const t of mapTargets) { if (t.id !== '???') { t.col = uniqueX.indexOf(t.cx); t.row = uniqueY.indexOf(t.cy); } }
             backBtn.classList.remove('hidden');
         }
         function drawMystery() {
             const sorted = [...mapTargets].sort((a,b) => a.row !== b.row ? a.row - b.row : a.col - b.col);
             for (let i = 0; i < sorted.length; i++) {
                 const t = sorted[i];
-                const tx = t.cx + (t.col >= 0 ? colOffsets[t.col] : 0) + shiftX;
-                const ty = t.cy + (t.row >= 0 ? rowOffsets[t.row] : 0) + shiftY;
+                const tx = t.cx + colOffsets[t.col];
+                const ty = t.cy + rowOffsets[t.row];
                 if (tx + t.w/2 < 0 || tx - t.w/2 > canvasW || ty + t.h/2 < 0 || ty - t.h/2 > canvasH) continue;
                 if (i > 0 && sorted[i-1].row === t.row) {
                     const prev = sorted[i-1];
-                    const px = prev.cx + colOffsets[prev.col] + shiftX, py = prev.cy + rowOffsets[prev.row] + shiftY;
+                    const px = prev.cx + colOffsets[prev.col], py = prev.cy + rowOffsets[prev.row];
                     ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(tx, ty);
                     ctx.strokeStyle = t.status === "completed" ? "rgba(240,165,0,0.3)" : "rgba(255,255,255,0.1)";
                     ctx.lineWidth = 1.5; ctx.setLineDash([4,4]); ctx.stroke(); ctx.setLineDash([]);
