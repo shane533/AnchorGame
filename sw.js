@@ -1,4 +1,4 @@
-const CACHE = 'anchor-game-v11';
+const CACHE = 'anchor-game-v13';
 const ASSETS = [
     './index.html',
     './anchor.webp',

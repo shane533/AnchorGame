@@ -500,6 +500,7 @@
         let irisActive = false, irisRadius = 0, irisDone = false;
         let irisTargetEntry = null;
         let shiftX = 0, shiftY = 0, mysteryAnchor = false;
+        let mysteryAnchorX = 0, mysteryAnchorY = 0;
         let colOffsets = [0,0,0], rowOffsets = [0,0,0];
         let introPhase = 0, introTimer = 0, fallY = 0, fallVY = 0, cameraPan = 0, dialogText = '', fadeAlpha = 0;
         let mapPhase = 0;
@@ -1759,7 +1760,7 @@
             state = 'ROTATING'; state2 = 'ROTATING';
             traps = [];
             survivalTime = 0; survivalSpawnTimer = 0; survivalSpawnInterval = 150;
-            document.getElementById('info').textContent = '不要碰到，坚持越久越好';
+            document.getElementById('info').textContent = '不要被碰到，坚持越久越好';
         }
 
         function updateLevel14() {
@@ -1908,6 +1909,8 @@
             if (gameState === 'MYSTERY') {
                 mouseDown = true;
                 mysteryAnchor = !mysteryAnchor;
+                mysteryAnchorX = pos.x;
+                mysteryAnchorY = pos.y;
                 return;
             }
 
@@ -1970,7 +1973,7 @@
 
             if (gameState === 'MYSTERY' && mysteryAnchor) {
                 let near = false;
-                const tcx = canvasW / 2, tcy = canvasH / 2;
+                const tcx = mysteryAnchorX, tcy = mysteryAnchorY;
                 const dirs = [{x:tcx,y:tcy-40},{x:tcx,y:tcy+40},{x:tcx-40,y:tcy},{x:tcx+40,y:tcy}];
                 for (const d of dirs) { if (Math.abs(mousePos.x-d.x)<14 && Math.abs(mousePos.y-d.y)<14) { near=true; break; } }
                 canvas.style.cursor = near ? 'pointer' : 'default';
@@ -2017,7 +2020,7 @@
             const pos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 
             if (gameState === 'MYSTERY' && mysteryAnchor) {
-                const tcx = canvasW / 2, tcy = canvasH / 2;
+                const tcx = mysteryAnchorX, tcy = mysteryAnchorY;
                 const dx = pos.x - tcx, dy = pos.y - tcy;
                 if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
                     const margin = 10;
@@ -2847,8 +2850,6 @@
                     introTimer--;
                     if (introTimer <= 0) {
                         introPhase = 3; gameState = 'MAP'; state = 'ROTATING';
-                        dialogText = '按住锚以切换其锚点，改变运动轨迹，进入目标点';
-                        document.getElementById('info').textContent = dialogText;
                         document.getElementById('info').style.transform = '';
                         document.getElementById('info').style.opacity = '';
                         initMap();
@@ -3119,6 +3120,9 @@
 
         function initMap() {
             applyScale(computeScale());
+            document.getElementById('info').textContent = completedChapters['3-3'] && !completedChapters['???']
+                ? '你能找到神秘关卡吗？'
+                : '按住锚以切换其锚点，改变运动轨迹，进入目标点';
             heroMotion = chapterIdx >= 3 && chapterIdx < 6 ? 'scale' : 'rotate';
             state = 'ROTATING';
             mapEntryCooldown = 10;
@@ -3361,7 +3365,7 @@
         }
 
         function drawMysteryAnchors() {
-            const tcx = canvasW / 2, tcy = canvasH / 2;
+            const tcx = mysteryAnchorX, tcy = mysteryAnchorY;
             const dirs = [
                 { x: tcx, y: tcy - 40, dx: 0, dy: -1 },
                 { x: tcx, y: tcy + 40, dx: 0, dy: 1 },
@@ -3456,6 +3460,11 @@
             else if (level === 7) initLevel7();
             else if (level === 8) initLevel8();
             else if (level === 9) initLevel9();
+
+            if (level === 3) document.getElementById('info').textContent = '不要碰到障碍哦';
+            else if (level === 4) document.getElementById('info').textContent = '能改变锚点的还有？';
+            else if (level === 13) document.getElementById('info').textContent = '也会有无法改变锚点的障碍';
+            else if (level !== 14) document.getElementById('info').textContent = '按住锚以切换其锚点，改变运动轨迹，进入目标点';
         }
 
         function backToMenu() {
